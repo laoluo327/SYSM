@@ -1,0 +1,33 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+
+# 数据库文件（包含业务数据，不要上传）
+server/db/*.db
+server/db/*.db-shm
+server/db/*.db-wal
+
+# 备份文件
+server/backups/
+
+# 环境变量（如有）
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+# 日志
+*.log
+
+# 截图
+*.png

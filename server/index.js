@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { initDb } = require('./db/init');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // 安全响应头
 app.use(helmet({
@@ -19,14 +19,18 @@ app.use(cors({
   origin: (requestOrigin, callback) => {
     // 同源请求、curl、Postman 等不带 origin，直接放行
     if (!requestOrigin) return callback(null, true);
-    // 允许同源（前端由同一 Express 托管时 origin = 自身地址，自动放行）
-    // 如需额外域名，在 ALLOWED_ORIGINS 环境变量中逗号分隔添加
+    // 允许 Render 部署域名和自定义域名
     const extra = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
     const allowed = [
       `http://localhost:${PORT}`,
       `http://127.0.0.1:${PORT}`,
+      'https://sysm.onrender.com',
       ...extra,
     ];
+    // 允许所有 .onrender.com 子域名
+    if (requestOrigin && requestOrigin.includes('.onrender.com')) {
+      return callback(null, true);
+    }
     if (allowed.some(o => requestOrigin.startsWith(o))) {
       callback(null, true);
     } else {

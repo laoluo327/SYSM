@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "做账管理系统",
   "scripts": {
-    "build": "cd client && npm install && node node_modules/vite/bin/vite.js build && cd ../server && npm install",
+    "build": "cd client && npm install && npm run build && cd ../server && npm install",
     "start": "node server/index.js"
   },
   "engines": {

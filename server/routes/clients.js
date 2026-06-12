@@ -27,6 +27,21 @@ router.get('/all', (req, res) => {
   res.json({ code: 0, data: list });
 });
 
+// 查找或创建客户单位（出库时按名称自动创建，查重）
+router.post('/find-or-create', (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    return res.json({ code: 400, message: '客户单位名称不能为空' });
+  }
+  const db = getDb();
+  const exists = db.prepare('SELECT id, name FROM clients WHERE name = ?').get(name.trim());
+  if (exists) {
+    return res.json({ code: 0, data: exists, message: '已存在' });
+  }
+  const result = db.prepare('INSERT INTO clients (name) VALUES (?)').run(name.trim());
+  res.json({ code: 0, data: { id: result.lastInsertRowid, name: name.trim() }, message: '已自动创建' });
+});
+
 router.post('/', adminMiddleware, (req, res) => {
   const { name, credit_code, address, contact, phone, remark } = req.body;
   if (!name || !name.trim()) {

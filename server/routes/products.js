@@ -74,9 +74,16 @@ router.delete('/:id', (req, res) => {
   }
   const { id } = req.params;
   const db = getDb();
-  const product = db.prepare('SELECT id FROM products WHERE id = ?').get(id);
+  const product = db.prepare('SELECT id, name FROM products WHERE id = ?').get(id);
   if (!product) {
     return res.json({ code: 400, message: '商品不存在' });
+  }
+  // 检查是否仍有库存（任意库房中库存 > 0）
+  const stockRow = db.prepare(
+    'SELECT SUM(quantity) as total FROM product_warehouse_stock WHERE product_id = ?'
+  ).get(id);
+  if (stockRow && stockRow.total > 0) {
+    return res.json({ code: 400, message: `商品「${product.name}」库房中仍有库存 ${stockRow.total}，请先清空库存再删除` });
   }
   const hasStock = db.prepare('SELECT id FROM stock_in WHERE product_id = ? LIMIT 1').get(id);
   const hasOut = db.prepare('SELECT id FROM stock_out WHERE product_id = ? LIMIT 1').get(id);

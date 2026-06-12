@@ -22,7 +22,7 @@ export default function StockOut() {
   const [warehouses, setWarehouses] = useState([]);
   const [warehouseStock, setWarehouseStock] = useState({}); // { product_id: qty }
   const [orderNo, setOrderNo] = useState('');
-  const [clientId, setClientId] = useState(null);
+  const [clientValue, setClientValue] = useState(null); // 数字=已选id，字符串=输入新名称
   const [warehouseId, setWarehouseId] = useState(null);
   const [items, setItems] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -53,7 +53,7 @@ export default function StockOut() {
     if (cRes.code === 0) setClients(cRes.data);
     if (noRes.code === 0) setOrderNo(noRes.data.order_no);
     if (wRes.code === 0) setWarehouses(wRes.data);
-    setClientId(null);
+    setClientValue(null);
     setWarehouseId(null);
     setWarehouseStock({});
     setItems([]);
@@ -93,14 +93,32 @@ export default function StockOut() {
     }));
   };
 
+  // 查找或自动创建客户单位：数字直接用作id，字符串则调find-or-create
+  const resolveClient = async () => {
+    const value = clientValue;
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'number') return value;
+    const name = String(value).trim();
+    if (!name) return null;
+    const res = await api.post('/clients/find-or-create', { name });
+    if (res.code === 0) {
+      setClients(prev => prev.find(c => c.id === res.data.id) ? prev : [...prev, res.data]);
+      if (res.message === '已自动创建') message.success(`客户单位「${name}」已自动创建`);
+      return res.data.id;
+    }
+    message.error(res.message || '创建客户单位失败');
+    return null;
+  };
+
   const handleSubmit = async () => {
-    if (!clientId) { message.warning('请选择客户单位'); return; }
     if (!warehouseId) { message.warning('请选择出货库房'); return; }
     const validItems = items.filter(i => i.product_id && i.quantity > 0);
     if (validItems.length === 0) { message.warning('请至少添加一条商品出库明细'); return; }
     setSubmitting(true);
+    const resolvedClientId = await resolveClient();
+    if (!resolvedClientId) { message.warning('请选择或输入客户单位'); setSubmitting(false); return; }
     const res = await api.post('/stock-out', {
-      order_no: orderNo, client_id: clientId, warehouse_id: warehouseId,
+      order_no: orderNo, client_id: resolvedClientId, warehouse_id: warehouseId,
       items: validItems.map(i => ({ product_id: i.product_id, unit: i.unit, price: i.price, quantity: i.quantity, remark: i.remark })),
     });
     if (res.code === 0) { message.success(res.message); setModalOpen(false); loadData(); }
@@ -214,9 +232,23 @@ export default function StockOut() {
               </div>
               <div>
                 <span style={{ color: '#999', fontSize: 13 }}>客户单位 <span style={{ color: '#ff4d4f' }}>*</span></span>
-                <Select allowClear showSearch optionFilterProp="label" placeholder="搜索选择客户单位"
-                  style={{ width: '100%' }} value={clientId} onChange={setClientId}
-                  options={clients.map(c => ({ value: c.id, label: c.name }))} />
+                <Select
+                  allowClear showSearch placeholder="搜索或输入新客户名"
+                  style={{ width: '100%' }}
+                  value={clientValue}
+                  onChange={v => setClientValue(v ?? null)}
+                  onSearch={v => { if (v && !clients.find(c => c.name === v)) setClientValue(v); }}
+                  onClear={() => setClientValue(null)}
+                  filterOption={(input, option) => String(option.label).toLowerCase().includes(input.toLowerCase())}
+                  notFoundContent={
+                    clientValue && typeof clientValue === 'string' && clientValue.trim() ? (
+                      <div style={{ padding: '4px 0', color: '#1677ff' }}>
+                        ✚ 将自动创建「{clientValue.trim()}」
+                      </div>
+                    ) : '无匹配客户'
+                  }
+                  options={clients.map(c => ({ value: c.id, label: c.name }))}
+                />
               </div>
               <div>
                 <span style={{ color: '#999', fontSize: 13 }}>出货库房 <span style={{ color: '#ff4d4f' }}>*</span></span>

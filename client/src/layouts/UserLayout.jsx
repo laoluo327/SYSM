@@ -143,12 +143,22 @@ export default function UserLayout() {
             <span className="header-title">{sysName}</span>
           </div>
           <div className="header-user">
-            <Dropdown menu={dropdownItems} placement="bottomRight">
-              <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Avatar style={{ backgroundColor: '#47B881' }} icon={<UserOutlined />} />
-                <span>{user.real_name || user.username}</span>
-              </div>
-            </Dropdown>
+            {isMobile ? (
+              <Button
+                type="text"
+                icon={<LogoutOutlined style={{ fontSize: 18, color: '#47B881' }} />}
+                onClick={handleLogout}
+                title="退出系统"
+                style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#47B881', fontWeight: 500 }}
+              >退出</Button>
+            ) : (
+              <Dropdown menu={dropdownItems} placement="bottomRight">
+                <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Avatar style={{ backgroundColor: '#47B881' }} icon={<UserOutlined />} />
+                  <span className="user-name">{user.real_name || user.username}</span>
+                </div>
+              </Dropdown>
+            )}
           </div>
         </Header>
         <Content className="layout-content">

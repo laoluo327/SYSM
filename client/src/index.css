@@ -312,7 +312,7 @@ body {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .header-user span {
+  .header-user .user-name {
     display: none;
   }
 

@@ -29,6 +29,21 @@ router.get('/all', (req, res) => {
   res.json({ code: 0, data: list });
 });
 
+// 查找或创建公司（入库时按名称自动创建，查重）
+router.post('/find-or-create', (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    return res.json({ code: 400, message: '公司名称不能为空' });
+  }
+  const db = getDb();
+  const exists = db.prepare('SELECT id, name FROM companies WHERE name = ?').get(name.trim());
+  if (exists) {
+    return res.json({ code: 0, data: exists, message: '已存在' });
+  }
+  const result = db.prepare('INSERT INTO companies (name) VALUES (?)').run(name.trim());
+  res.json({ code: 0, data: { id: result.lastInsertRowid, name: name.trim() }, message: '已自动创建' });
+});
+
 // 添加公司
 router.post('/', adminMiddleware, (req, res) => {
   const { name, credit_code, address, contact, phone, remark } = req.body;

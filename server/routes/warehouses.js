@@ -12,6 +12,21 @@ router.get('/all', (req, res) => {
   res.json({ code: 0, data: list });
 });
 
+// 查找或创建库房（入库时按名称自动创建，查重）
+router.post('/find-or-create', (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    return res.json({ code: 400, message: '库房名称不能为空' });
+  }
+  const db = getDb();
+  const exists = db.prepare('SELECT id, name FROM warehouses WHERE name = ?').get(name.trim());
+  if (exists) {
+    return res.json({ code: 0, data: exists, message: '已存在' });
+  }
+  const result = db.prepare('INSERT INTO warehouses (name) VALUES (?)').run(name.trim());
+  res.json({ code: 0, data: { id: result.lastInsertRowid, name: name.trim() }, message: '已自动创建' });
+});
+
 // 获取某商品在各库房的库存分布
 router.get('/stock/:productId', (req, res) => {
   const db = getDb();
@@ -79,8 +94,15 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   const { id } = req.params;
   const db = getDb();
-  const wh = db.prepare('SELECT id FROM warehouses WHERE id = ?').get(id);
+  const wh = db.prepare('SELECT id, name FROM warehouses WHERE id = ?').get(id);
   if (!wh) return res.json({ code: 400, message: '库房不存在' });
+  // 检查该库房是否仍有商品库存
+  const stockRow = db.prepare(
+    'SELECT SUM(quantity) as total FROM product_warehouse_stock WHERE warehouse_id = ?'
+  ).get(id);
+  if (stockRow && stockRow.total > 0) {
+    return res.json({ code: 400, message: `库房「${wh.name}」中仍有商品库存 ${stockRow.total}，请先清空库存再删除` });
+  }
   const hasIn = db.prepare('SELECT id FROM stock_in WHERE warehouse_id = ? LIMIT 1').get(id);
   const hasOut = db.prepare('SELECT id FROM stock_out WHERE warehouse_id = ? LIMIT 1').get(id);
   if (hasIn || hasOut) {

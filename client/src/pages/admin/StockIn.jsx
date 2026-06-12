@@ -21,8 +21,9 @@ export default function StockIn() {
   const [companies, setCompanies] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [orderNo, setOrderNo] = useState('');
-  const [companyId, setCompanyId] = useState(null);
-  const [warehouseId, setWarehouseId] = useState(null);
+  // companyValue/warehouseValue: 选中已有项时为数字id，手动输入新名称时为字符串
+  const [companyValue, setCompanyValue] = useState(null);
+  const [warehouseValue, setWarehouseValue] = useState(null);
   const [items, setItems] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [createTime, setCreateTime] = useState('');
@@ -52,8 +53,8 @@ export default function StockIn() {
     if (cRes.code === 0) setCompanies(cRes.data);
     if (noRes.code === 0) setOrderNo(noRes.data.order_no);
     if (wRes.code === 0) setWarehouses(wRes.data);
-    setCompanyId(null);
-    setWarehouseId(null);
+    setCompanyValue(null);
+    setWarehouseValue(null);
     setItems([]);
     setCreateTime(formatNow());
     setModalOpen(true);
@@ -75,14 +76,34 @@ export default function StockIn() {
     }));
   };
 
+  // 根据已选id（数字）或输入名称（字符串），查找或自动创建，返回id
+  const resolveEntity = async (value, listSetter, apiPath, label) => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'number') return value; // 已从列表选择，直接返回id
+    const name = String(value).trim();
+    if (!name) return null;
+    const res = await api.post(apiPath, { name });
+    if (res.code === 0) {
+      listSetter(prev => prev.find(x => x.id === res.data.id) ? prev : [...prev, res.data]);
+      if (res.message === '已自动创建') message.success(`${label}「${name}」已自动创建`);
+      return res.data.id;
+    }
+    message.error(res.message || `创建${label}失败`);
+    return null;
+  };
+
   const handleSubmit = async () => {
-    if (!companyId) { message.warning('请选择供货公司'); return; }
-    if (!warehouseId) { message.warning('请选择目标库房'); return; }
     const validItems = items.filter(i => i.product_id && i.quantity > 0);
     if (validItems.length === 0) { message.warning('请至少添加一条商品入库明细'); return; }
     setSubmitting(true);
+    const [resolvedCompanyId, resolvedWarehouseId] = await Promise.all([
+      resolveEntity(companyValue, setCompanies, '/companies/find-or-create', '供货公司'),
+      resolveEntity(warehouseValue, setWarehouses, '/warehouses/find-or-create', '目标库房'),
+    ]);
+    if (!resolvedCompanyId) { message.warning('请选择或输入供货公司'); setSubmitting(false); return; }
+    if (!resolvedWarehouseId) { message.warning('请选择或输入目标库房'); setSubmitting(false); return; }
     const res = await api.post('/stock-in', {
-      order_no: orderNo, company_id: companyId, warehouse_id: warehouseId,
+      order_no: orderNo, company_id: resolvedCompanyId, warehouse_id: resolvedWarehouseId,
       items: validItems.map(i => ({ product_id: i.product_id, unit: i.unit, price: i.price, quantity: i.quantity, remark: i.remark })),
     });
     if (res.code === 0) { message.success(res.message); setModalOpen(false); loadData(); }
@@ -193,15 +214,43 @@ export default function StockIn() {
               </div>
               <div>
                 <span style={{ color: '#999', fontSize: 13 }}>供货公司 <span style={{ color: '#ff4d4f' }}>*</span></span>
-                <Select allowClear showSearch optionFilterProp="label" placeholder="搜索选择供货公司"
-                  style={{ width: '100%' }} value={companyId} onChange={setCompanyId}
-                  options={companies.map(c => ({ value: c.id, label: c.name }))} />
+                <Select
+                  allowClear showSearch placeholder="搜索或输入新公司名"
+                  style={{ width: '100%' }}
+                  value={companyValue}
+                  onChange={v => setCompanyValue(v ?? null)}
+                  onSearch={v => { if (v && !companies.find(c => c.name === v)) setCompanyValue(v); }}
+                  onClear={() => setCompanyValue(null)}
+                  filterOption={(input, option) => String(option.label).toLowerCase().includes(input.toLowerCase())}
+                  notFoundContent={
+                    companyValue && typeof companyValue === 'string' && companyValue.trim() ? (
+                      <div style={{ padding: '4px 0', color: '#1677ff' }}>
+                        ✚ 将自动创建「{companyValue.trim()}」
+                      </div>
+                    ) : '无匹配公司'
+                  }
+                  options={companies.map(c => ({ value: c.id, label: c.name }))}
+                />
               </div>
               <div>
                 <span style={{ color: '#999', fontSize: 13 }}>目标库房 <span style={{ color: '#ff4d4f' }}>*</span></span>
-                <Select allowClear showSearch optionFilterProp="label" placeholder="选择入库库房"
-                  style={{ width: '100%' }} value={warehouseId} onChange={setWarehouseId}
-                  options={warehouses.map(w => ({ value: w.id, label: w.name }))} />
+                <Select
+                  allowClear showSearch placeholder="搜索或输入新库房名"
+                  style={{ width: '100%' }}
+                  value={warehouseValue}
+                  onChange={v => setWarehouseValue(v ?? null)}
+                  onSearch={v => { if (v && !warehouses.find(w => w.name === v)) setWarehouseValue(v); }}
+                  onClear={() => setWarehouseValue(null)}
+                  filterOption={(input, option) => String(option.label).toLowerCase().includes(input.toLowerCase())}
+                  notFoundContent={
+                    warehouseValue && typeof warehouseValue === 'string' && warehouseValue.trim() ? (
+                      <div style={{ padding: '4px 0', color: '#1677ff' }}>
+                        ✚ 将自动创建「{warehouseValue.trim()}」
+                      </div>
+                    ) : '无匹配库房'
+                  }
+                  options={warehouses.map(w => ({ value: w.id, label: w.name }))}
+                />
               </div>
             </div>
           </div>

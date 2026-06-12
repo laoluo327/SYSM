@@ -2,7 +2,7 @@ services:
   - type: web
     name: sysm
     runtime: node
-    buildCommand: cd client && npm install && npx vite build && cd ../server && npm install
+    buildCommand: cd client && rm -rf node_modules .vite-temp && npm install && npx vite build && cd ../server && rm -rf node_modules && npm install
     startCommand: node server/index.js
     envVars:
       - key: NODE_ENV

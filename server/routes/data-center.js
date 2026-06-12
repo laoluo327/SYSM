@@ -45,27 +45,31 @@ router.get('/export/:type', adminMiddleware, (req, res) => {
       break;
     case 'stock-in':
       filename = '入库明细';
-      headers = ['ID', '商品名称', '供货公司', '单位', '单价', '数量', '入库前数量', '入库后数量', '合计金额', '备注', '入库人', '入库时间'];
+      headers = ['ID', '入库单号', '商品名称', '供货公司', '入库库房', '单位', '单价', '数量', '入库前数量', '入库后数量', '合计金额', '备注', '入库人', '入库时间'];
       const stockIn = db.prepare(`
-        SELECT si.*, p.name as product_name, c.name as company_name 
+        SELECT si.*, p.name as product_name, c.name as company_name,
+          w.name as warehouse_name
         FROM stock_in si 
         LEFT JOIN products p ON si.product_id = p.id 
         LEFT JOIN companies c ON si.company_id = c.id 
+        LEFT JOIN warehouses w ON si.warehouse_id = w.id
         ORDER BY si.id ASC
       `).all();
-      data = stockIn.map(s => [s.id, s.product_name, s.company_name || '', s.unit, s.price, s.quantity, s.before_qty, s.after_qty, s.total_amount, s.remark, s.operator, s.created_at]);
+      data = stockIn.map(s => [s.id, s.order_no, s.product_name, s.company_name || '', s.warehouse_name || '', s.unit, s.price, s.quantity, s.before_qty, s.after_qty, s.total_amount, s.remark, s.operator, s.created_at]);
       break;
     case 'stock-out':
       filename = '出库明细';
-      headers = ['ID', '商品名称', '客户单位', '单位', '单价', '数量', '出库前数量', '出库后数量', '合计金额', '备注', '出库人', '出库时间'];
+      headers = ['ID', '出库单号', '商品名称', '客户单位', '出货库房', '单位', '单价', '数量', '出库前数量', '出库后数量', '合计金额', '备注', '出库人', '出库时间'];
       const stockOut = db.prepare(`
-        SELECT so.*, p.name as product_name, cl.name as client_name 
+        SELECT so.*, p.name as product_name, cl.name as client_name,
+          w.name as warehouse_name
         FROM stock_out so 
         LEFT JOIN products p ON so.product_id = p.id 
         LEFT JOIN clients cl ON so.client_id = cl.id 
+        LEFT JOIN warehouses w ON so.warehouse_id = w.id
         ORDER BY so.id ASC
       `).all();
-      data = stockOut.map(s => [s.id, s.product_name, s.client_name || '', s.unit, s.price, s.quantity, s.before_qty, s.after_qty, s.total_amount, s.remark, s.operator, s.created_at]);
+      data = stockOut.map(s => [s.id, s.order_no, s.product_name, s.client_name || '', s.warehouse_name || '', s.unit, s.price, s.quantity, s.before_qty, s.after_qty, s.total_amount, s.remark, s.operator, s.created_at]);
       break;
     case 'expenses':
       filename = '开销明细';

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Modal, Form, Input, InputNumber, Select, message, Card, Space, Tag } from 'antd';
-import { SearchOutlined, ImportOutlined, ExportOutlined, EyeOutlined, ShoppingCartOutlined, UserOutlined, ClockCircleOutlined, FileTextOutlined } from '@ant-design/icons';
+import { SearchOutlined, ImportOutlined, ExportOutlined, EyeOutlined, ShoppingCartOutlined, UserOutlined, ClockCircleOutlined, FileTextOutlined, BankOutlined } from '@ant-design/icons';
 import api from '../../api';
 
 export default function ProductList() {
@@ -13,9 +13,11 @@ export default function ProductList() {
   const [stockOutOpen, setStockOutOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailRecord, setDetailRecord] = useState(null);
+  const [warehouseStock, setWarehouseStock] = useState([]);
   const [currentProduct, setCurrentProduct] = useState(null);
   const [companies, setCompanies] = useState([]);
   const [clients, setClients] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [stockInForm] = Form.useForm();
   const [stockOutForm] = Form.useForm();
 
@@ -35,9 +37,10 @@ export default function ProductList() {
     setCurrentProduct(record);
     stockInForm.resetFields();
     stockInForm.setFieldsValue({ unit: record.unit, price: record.price, quantity: 0 });
-    const [cRes, noRes] = await Promise.all([api.get('/companies/all'), api.get('/stock-in/generate-order-no')]);
+    const [cRes, noRes, wRes] = await Promise.all([api.get('/companies/all'), api.get('/stock-in/generate-order-no'), api.get('/warehouses/all')]);
     if (cRes.code === 0) setCompanies(cRes.data);
     if (noRes.code === 0) setStockInOrderNo(noRes.data.order_no);
+    if (wRes.code === 0) setWarehouses(wRes.data);
     setStockInOpen(true);
   };
 
@@ -45,9 +48,10 @@ export default function ProductList() {
     setCurrentProduct(record);
     stockOutForm.resetFields();
     stockOutForm.setFieldsValue({ unit: record.unit, price: record.price });
-    const [cRes, noRes] = await Promise.all([api.get('/clients/all'), api.get('/stock-out/generate-order-no')]);
+    const [cRes, noRes, wRes] = await Promise.all([api.get('/clients/all'), api.get('/stock-out/generate-order-no'), api.get('/warehouses/all')]);
     if (cRes.code === 0) setClients(cRes.data);
     if (noRes.code === 0) setStockOutOrderNo(noRes.data.order_no);
+    if (wRes.code === 0) setWarehouses(wRes.data);
     setStockOutOpen(true);
   };
 
@@ -56,6 +60,7 @@ export default function ProductList() {
     const res = await api.post('/stock-in', {
       order_no: stockInOrderNo,
       company_id: values.company_id,
+      warehouse_id: values.warehouse_id,
       items: [{ product_id: currentProduct.id, unit: values.unit, price: values.price, quantity: values.quantity, remark: values.remark }],
     });
     if (res.code === 0) { message.success('入库成功'); setStockInOpen(false); loadData(); }
@@ -67,13 +72,20 @@ export default function ProductList() {
     const res = await api.post('/stock-out', {
       order_no: stockOutOrderNo,
       client_id: values.client_id,
+      warehouse_id: values.warehouse_id,
       items: [{ product_id: currentProduct.id, unit: values.unit, price: values.price, quantity: values.quantity, remark: values.remark }],
     });
     if (res.code === 0) { message.success('出库成功'); setStockOutOpen(false); loadData(); }
     else { message.error(res.message); }
   };
 
-  const showDetail = (record) => { setDetailRecord(record); setDetailOpen(true); };
+  const showDetail = async (record) => {
+    setDetailRecord(record);
+    setWarehouseStock([]);
+    setDetailOpen(true);
+    const res = await api.get(`/warehouses/stock/${record.id}`);
+    if (res.code === 0) setWarehouseStock(res.data);
+  };
 
   const columns = [
     { title: '商品名称', dataIndex: 'name', key: 'name' },
@@ -116,6 +128,10 @@ export default function ProductList() {
               <Select allowClear showSearch optionFilterProp="label" placeholder="搜索选择供货公司"
                 options={companies.map(c => ({ value: c.id, label: c.name }))} />
             </Form.Item>
+            <Form.Item name="warehouse_id" label="目标库房" rules={[{ required: true, message: '请选择库房' }]}>
+              <Select allowClear showSearch optionFilterProp="label" placeholder="选择入库库房"
+                options={warehouses.map(w => ({ value: w.id, label: w.name }))} />
+            </Form.Item>
             <Space size="large">
               <Form.Item name="unit" label="单位"><Input style={{ width: 100 }} /></Form.Item>
               <Form.Item name="price" label="单价" rules={[{ required: true }]}><InputNumber min={0} precision={2} /></Form.Item>
@@ -138,6 +154,10 @@ export default function ProductList() {
             <Form.Item name="client_id" label="客户单位" rules={[{ required: true, message: '请选择客户单位' }]}>
               <Select allowClear showSearch optionFilterProp="label" placeholder="搜索选择客户单位"
                 options={clients.map(c => ({ value: c.id, label: c.name }))} />
+            </Form.Item>
+            <Form.Item name="warehouse_id" label="出货库房" rules={[{ required: true, message: '请选择库房' }]}>
+              <Select allowClear showSearch optionFilterProp="label" placeholder="选择出货库房"
+                options={warehouses.map(w => ({ value: w.id, label: w.name }))} />
             </Form.Item>
             <Space size="large">
               <Form.Item name="unit" label="单位"><Input style={{ width: 100 }} /></Form.Item>
@@ -179,6 +199,19 @@ export default function ProductList() {
                 <div><span style={{ color: '#999', fontSize: 13 }}><ClockCircleOutlined style={{ marginRight: 4 }} />记录时间</span><div style={{ fontWeight: 500 }}>{detailRecord.created_at}</div></div>
               </div>
             </div>
+            {warehouseStock.length > 0 && (
+              <div className="form-section" style={{ marginBottom: 0 }}>
+                <div className="form-section-title"><BankOutlined /> 库房库存分布</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+                  {warehouseStock.map(w => (
+                    <Card key={w.id} size="small" style={{ textAlign: 'center', background: w.quantity > 0 ? '#f0f5ff' : '#fafafa', border: `1px solid ${w.quantity > 0 ? '#adc6ff' : '#d9d9d9'}` }}>
+                      <div style={{ color: '#666', fontSize: 12, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
+                      <Tag color={w.quantity > 0 ? 'geekblue' : 'default'} style={{ fontSize: 14, padding: '2px 8px' }}>{w.quantity}</Tag>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Modal>

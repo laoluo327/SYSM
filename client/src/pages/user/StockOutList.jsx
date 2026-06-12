@@ -19,8 +19,11 @@ export default function StockOutList() {
   const [keyword, setKeyword] = useState('');
   const [products, setProducts] = useState([]);
   const [clients, setClients] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
+  const [warehouseStock, setWarehouseStock] = useState({});
   const [orderNo, setOrderNo] = useState('');
   const [clientId, setClientId] = useState(null);
+  const [warehouseId, setWarehouseId] = useState(null);
   const [items, setItems] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [createTime, setCreateTime] = useState('');
@@ -40,18 +43,36 @@ export default function StockOutList() {
   };
 
   const openModal = async () => {
-    const [pRes, cRes, noRes] = await Promise.all([
+    const [pRes, cRes, noRes, wRes] = await Promise.all([
       api.get('/products', { params: { pageSize: 1000 } }),
       api.get('/clients/all'),
       api.get('/stock-out/generate-order-no'),
+      api.get('/warehouses/all'),
     ]);
     if (pRes.code === 0) setProducts(pRes.data.list);
     if (cRes.code === 0) setClients(cRes.data);
     if (noRes.code === 0) setOrderNo(noRes.data.order_no);
+    if (wRes.code === 0) setWarehouses(wRes.data);
     setClientId(null);
+    setWarehouseId(null);
+    setWarehouseStock({});
     setItems([]);
     setCreateTime(formatNow());
     setModalOpen(true);
+  };
+
+  const handleWarehouseChange = async (wId) => {
+    setWarehouseId(wId);
+    if (!wId) { setWarehouseStock({}); return; }
+    const stockMap = {};
+    await Promise.all(products.map(async p => {
+      const res = await api.get(`/warehouses/stock/${p.id}`);
+      if (res.code === 0) {
+        const wh = res.data.find(w => w.id === wId);
+        stockMap[p.id] = wh ? wh.quantity : 0;
+      }
+    }));
+    setWarehouseStock(stockMap);
   };
 
   const addItem = () => {
@@ -72,11 +93,12 @@ export default function StockOutList() {
 
   const handleSubmit = async () => {
     if (!clientId) { message.warning('请选择客户单位'); return; }
+    if (!warehouseId) { message.warning('请选择出货库房'); return; }
     const validItems = items.filter(i => i.product_id && i.quantity > 0);
     if (validItems.length === 0) { message.warning('请至少添加一条商品出库明细'); return; }
     setSubmitting(true);
     const res = await api.post('/stock-out', {
-      order_no: orderNo, client_id: clientId,
+      order_no: orderNo, client_id: clientId, warehouse_id: warehouseId,
       items: validItems.map(i => ({ product_id: i.product_id, unit: i.unit, price: i.price, quantity: i.quantity, remark: i.remark })),
     });
     if (res.code === 0) { message.success(res.message); setModalOpen(false); loadData(); }
@@ -107,10 +129,10 @@ export default function StockOutList() {
     document.body.removeChild(wrapper);
   };
 
-  // 出库单列表列
   const orderColumns = [
     { title: '出库单号', dataIndex: 'order_no', key: 'order_no', render: v => v ? <Tag color="orange">{v}</Tag> : '-' },
     { title: '客户单位', dataIndex: 'client_name', key: 'client_name' },
+    { title: '出货库房', dataIndex: 'warehouse_name', key: 'warehouse_name', render: v => v ? <Tag color="purple">{v}</Tag> : '-' },
     { title: '商品种类', dataIndex: 'item_count', key: 'item_count', render: v => `${v} 种` },
     { title: '总数量', dataIndex: 'total_qty', key: 'total_qty' },
     { title: '总金额', dataIndex: 'total_amount', key: 'total_amount', render: v => <span style={{ color: '#fa8c16', fontWeight: 600 }}>¥{v.toFixed(2)}</span> },
@@ -133,12 +155,15 @@ export default function StockOutList() {
     )},
   ];
 
-  // 新建出库单 - 商品明细列（含合计金额）
+  // 新建出库单 - 商品明细列
   const formItemColumns = [
     { title: '商品', width: 180, render: (_, r) => (
       <Select showSearch optionFilterProp="label" placeholder="搜索选择商品" style={{ width: '100%' }}
         value={r.product_id} onChange={v => updateItem(r.key, 'product_id', v)}
-        options={products.map(p => ({ value: p.id, label: `${p.name}${p.spec ? ` (${p.spec})` : ''} [库存:${p.quantity}]` }))} />
+        options={products.map(p => ({
+          value: p.id,
+          label: `${p.name}${p.spec ? ` (${p.spec})` : ''} [库存:${warehouseId && warehouseStock[p.id] !== undefined ? warehouseStock[p.id] : p.quantity}]`
+        }))} />
     )},
     { title: '单位', width: 80, render: (_, r) => <Input value={r.unit} onChange={e => updateItem(r.key, 'unit', e.target.value)} /> },
     { title: '单价', width: 110, render: (_, r) => (
@@ -175,7 +200,7 @@ export default function StockOutList() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="form-section" style={{ marginBottom: 0 }}>
             <div className="form-section-title">出库单信息</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px 24px', alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px 24px', alignItems: 'start' }}>
               <div>
                 <span style={{ color: '#999', fontSize: 13 }}>出库单号</span>
                 <div><Tag color="orange" style={{ fontSize: 15, padding: '4px 12px' }}>{orderNo}</Tag></div>
@@ -189,6 +214,12 @@ export default function StockOutList() {
                 <Select allowClear showSearch optionFilterProp="label" placeholder="搜索选择客户单位"
                   style={{ width: '100%' }} value={clientId} onChange={setClientId}
                   options={clients.map(c => ({ value: c.id, label: c.name }))} />
+              </div>
+              <div>
+                <span style={{ color: '#999', fontSize: 13 }}>出货库房 <span style={{ color: '#ff4d4f' }}>*</span></span>
+                <Select allowClear showSearch optionFilterProp="label" placeholder="选择出货库房"
+                  style={{ width: '100%' }} value={warehouseId} onChange={handleWarehouseChange}
+                  options={warehouses.map(w => ({ value: w.id, label: w.name }))} />
               </div>
             </div>
           </div>
@@ -247,6 +278,7 @@ export default function StockOutList() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, fontSize: 13 }}>
               <div>客户单位：{orderItems[0]?.client_name || '-'}</div>
+              <div>出货库房：<strong>{orderItems[0]?.warehouse_name || '-'}</strong></div>
               <div>出库人：{orderItems[0]?.operator || '-'}</div>
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -300,6 +332,7 @@ export default function StockOutList() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
                 <div><span style={{ color: '#999', fontSize: 13 }}>出库单号</span><div><Tag color="orange">{itemDetail.order_no || '-'}</Tag></div></div>
                 <div><span style={{ color: '#999', fontSize: 13 }}>客户单位</span><div style={{ fontWeight: 500 }}>{itemDetail.client_name || '-'}</div></div>
+                <div><span style={{ color: '#999', fontSize: 13 }}>出货库房</span><div style={{ fontWeight: 500 }}>{itemDetail.warehouse_name || '-'}</div></div>
               </div>
             </div>
             <div className="form-section" style={{ marginBottom: 0 }}>

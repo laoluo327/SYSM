@@ -48,10 +48,12 @@ router.get('/', (req, res) => {
   `).get(...params).count;
   const list = db.prepare(`
     SELECT so.order_no, cl.name as client_name,
+      w.name as warehouse_name,
       SUM(so.quantity) as total_qty, SUM(so.total_amount) as total_amount,
       COUNT(*) as item_count, so.operator, MIN(so.created_at) as created_at
     FROM stock_out so
     LEFT JOIN clients cl ON so.client_id = cl.id
+    LEFT JOIN warehouses w ON so.warehouse_id = w.id
     ${where}
     GROUP BY so.order_no
     ORDER BY MIN(so.id) DESC LIMIT ? OFFSET ?
@@ -64,10 +66,12 @@ router.get('/order/:orderNo', (req, res) => {
   const db = getDb();
   const { orderNo } = req.params;
   const list = db.prepare(`
-    SELECT so.*, p.name as product_name, cl.name as client_name
+    SELECT so.*, p.name as product_name, cl.name as client_name,
+      w.name as warehouse_name
     FROM stock_out so
     LEFT JOIN products p ON so.product_id = p.id
     LEFT JOIN clients cl ON so.client_id = cl.id
+    LEFT JOIN warehouses w ON so.warehouse_id = w.id
     WHERE so.order_no = ?
     ORDER BY so.id ASC
   `).all(orderNo);
@@ -104,18 +108,27 @@ router.get('/items', (req, res) => {
 
 // 批量出库（同一出库单号下多条商品）
 router.post('/', (req, res) => {
-  const { order_no, client_id, items } = req.body;
+  const { order_no, client_id, warehouse_id, items } = req.body;
   if (!order_no) {
     return res.json({ code: 400, message: '出库单号缺失' });
   }
   if (!client_id) {
     return res.json({ code: 400, message: '请选择客户单位' });
   }
+  if (!warehouse_id) {
+    return res.json({ code: 400, message: '请选择出货库房' });
+  }
   if (!Array.isArray(items) || items.length === 0) {
     return res.json({ code: 400, message: '请至少添加一条商品出库明细' });
   }
 
   const db = getDb();
+
+  // 验证库房存在
+  const warehouse = db.prepare('SELECT id FROM warehouses WHERE id = ?').get(warehouse_id);
+  if (!warehouse) {
+    return res.json({ code: 400, message: '选择的库房不存在' });
+  }
 
   const transaction = db.transaction(() => {
     for (const item of items) {
@@ -127,19 +140,29 @@ router.post('/', (req, res) => {
       if (!product) {
         throw new Error(`商品ID ${product_id} 不存在`);
       }
-      if (product.quantity < quantity) {
-        throw new Error(`【${product.name}】库存不足，当前库存: ${product.quantity}`);
+      // 检查该库房库存
+      const whStock = db.prepare('SELECT quantity FROM product_warehouse_stock WHERE product_id = ? AND warehouse_id = ?')
+        .get(product_id, warehouse_id);
+      const whQty = whStock ? whStock.quantity : 0;
+      if (whQty < quantity) {
+        throw new Error(`【${product.name}】在该库房库存不足，当前库存: ${whQty}`);
       }
       const before_qty = product.quantity;
       const after_qty = before_qty - quantity;
       const total_amount = price * quantity;
 
       db.prepare(`
-        INSERT INTO stock_out (order_no, product_id, client_id, unit, price, quantity, before_qty, after_qty, total_amount, remark, operator)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(order_no, product_id, client_id, unit || product.unit, price || product.price, quantity, before_qty, after_qty, total_amount, remark || '', req.user.real_name);
+        INSERT INTO stock_out (order_no, product_id, client_id, warehouse_id, unit, price, quantity, before_qty, after_qty, total_amount, remark, operator)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(order_no, product_id, client_id, warehouse_id, unit || product.unit, price || product.price, quantity, before_qty, after_qty, total_amount, remark || '', req.user.real_name);
 
+      // 更新总库存
       db.prepare('UPDATE products SET quantity = ? WHERE id = ?').run(after_qty, product_id);
+
+      // 减少库房库存
+      db.prepare(`
+        UPDATE product_warehouse_stock SET quantity = quantity - ? WHERE product_id = ? AND warehouse_id = ?
+      `).run(quantity, product_id, warehouse_id);
     }
   });
 

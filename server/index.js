@@ -77,6 +77,7 @@ const stockOutRoutes = require('./routes/stock-out');
 const expenseRoutes = require('./routes/expenses');
 const dashboardRoutes = require('./routes/dashboard');
 const dataCenterRoutes = require('./routes/data-center');
+const warehouseRoutes = require('./routes/warehouses');
 
 // 注册路由（登录接口单独加频率限制）
 app.use('/api/auth/login', loginLimiter);
@@ -91,6 +92,7 @@ app.use('/api/stock-out', stockOutRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/data-center', dataCenterRoutes);
+app.use('/api/warehouses', warehouseRoutes);
 
 // 静态文件托管（生产环境）
 app.use(express.static(path.join(__dirname, '..', 'dist')));

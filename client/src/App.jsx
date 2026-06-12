@@ -13,6 +13,7 @@ import StockIn from './pages/admin/StockIn';
 import StockOut from './pages/admin/StockOut';
 import Expenses from './pages/admin/Expenses';
 import DataCenter from './pages/admin/DataCenter';
+import AdminWarehouses from './pages/admin/Warehouses';
 import UserDashboard from './pages/user/Dashboard';
 import ChangePassword from './pages/user/ChangePassword';
 import ProductList from './pages/user/ProductList';
@@ -20,6 +21,7 @@ import ExpenseList from './pages/user/ExpenseList';
 import UserDataCenter from './pages/user/DataCenter';
 import UserStockInList from './pages/user/StockInList';
 import UserStockOutList from './pages/user/StockOutList';
+import UserWarehouseList from './pages/user/WarehouseList';
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -43,6 +45,7 @@ function App() {
           <Route path="stock-out" element={<StockOut />} />
           <Route path="expenses" element={<Expenses />} />
           <Route path="data-center" element={<DataCenter />} />
+          <Route path="warehouses" element={<AdminWarehouses />} />
         </Route>
         <Route path="/user" element={<PrivateRoute><UserLayout /></PrivateRoute>}>
           <Route index element={<UserDashboard />} />
@@ -52,6 +55,7 @@ function App() {
           <Route path="stock-out" element={<UserStockOutList />} />
           <Route path="expenses" element={<ExpenseList />} />
           <Route path="data-center" element={<UserDataCenter />} />
+          <Route path="warehouses" element={<UserWarehouseList />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

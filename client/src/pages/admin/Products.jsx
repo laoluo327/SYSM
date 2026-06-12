@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, InputNumber, Popconfirm, message, Card, Space } from 'antd';
-import { PlusOutlined, SearchOutlined, EyeOutlined, ShoppingCartOutlined, UserOutlined, ClockCircleOutlined, FileTextOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, InputNumber, Popconfirm, message, Card, Space, Tag } from 'antd';
+import { PlusOutlined, SearchOutlined, EyeOutlined, ShoppingCartOutlined, UserOutlined, ClockCircleOutlined, FileTextOutlined, BankOutlined } from '@ant-design/icons';
 import api from '../../api';
 
 export default function Products() {
@@ -11,6 +11,7 @@ export default function Products() {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailRecord, setDetailRecord] = useState(null);
+  const [warehouseStock, setWarehouseStock] = useState([]);
   const [editId, setEditId] = useState(null);
   const [keyword, setKeyword] = useState('');
   const [form] = Form.useForm();
@@ -36,7 +37,13 @@ export default function Products() {
     else { message.error(res.message); }
   };
 
-  const showDetail = (record) => { setDetailRecord(record); setDetailOpen(true); };
+  const showDetail = async (record) => {
+    setDetailRecord(record);
+    setWarehouseStock([]);
+    setDetailOpen(true);
+    const res = await api.get(`/warehouses/stock/${record.id}`);
+    if (res.code === 0) setWarehouseStock(res.data);
+  };
 
   const columns = [
     { title: '商品名称', dataIndex: 'name', key: 'name' },
@@ -105,6 +112,19 @@ export default function Products() {
                 <div><span style={{ color: '#999', fontSize: 13 }}><ClockCircleOutlined style={{ marginRight: 4 }} />记录时间</span><div style={{ fontWeight: 500 }}>{detailRecord.created_at}</div></div>
               </div>
             </div>
+            {warehouseStock.length > 0 && (
+              <div className="form-section" style={{ marginBottom: 0 }}>
+                <div className="form-section-title"><BankOutlined /> 库房库存分布</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+                  {warehouseStock.map(w => (
+                    <Card key={w.id} size="small" style={{ textAlign: 'center', background: w.quantity > 0 ? '#f0f5ff' : '#fafafa', border: `1px solid ${w.quantity > 0 ? '#adc6ff' : '#d9d9d9'}` }}>
+                      <div style={{ color: '#666', fontSize: 12, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
+                      <Tag color={w.quantity > 0 ? 'geekblue' : 'default'} style={{ fontSize: 14, padding: '2px 8px' }}>{w.quantity}</Tag>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Modal>

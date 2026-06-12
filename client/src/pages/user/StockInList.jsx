@@ -19,8 +19,10 @@ export default function StockInList() {
   const [keyword, setKeyword] = useState('');
   const [products, setProducts] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
   const [orderNo, setOrderNo] = useState('');
   const [companyId, setCompanyId] = useState(null);
+  const [warehouseId, setWarehouseId] = useState(null);
   const [items, setItems] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [createTime, setCreateTime] = useState('');
@@ -40,15 +42,18 @@ export default function StockInList() {
   };
 
   const openModal = async () => {
-    const [pRes, cRes, noRes] = await Promise.all([
+    const [pRes, cRes, noRes, wRes] = await Promise.all([
       api.get('/products', { params: { pageSize: 1000 } }),
       api.get('/companies/all'),
       api.get('/stock-in/generate-order-no'),
+      api.get('/warehouses/all'),
     ]);
     if (pRes.code === 0) setProducts(pRes.data.list);
     if (cRes.code === 0) setCompanies(cRes.data);
     if (noRes.code === 0) setOrderNo(noRes.data.order_no);
+    if (wRes.code === 0) setWarehouses(wRes.data);
     setCompanyId(null);
+    setWarehouseId(null);
     setItems([]);
     setCreateTime(formatNow());
     setModalOpen(true);
@@ -72,11 +77,12 @@ export default function StockInList() {
 
   const handleSubmit = async () => {
     if (!companyId) { message.warning('请选择供货公司'); return; }
+    if (!warehouseId) { message.warning('请选择目标库房'); return; }
     const validItems = items.filter(i => i.product_id && i.quantity > 0);
     if (validItems.length === 0) { message.warning('请至少添加一条商品入库明细'); return; }
     setSubmitting(true);
     const res = await api.post('/stock-in', {
-      order_no: orderNo, company_id: companyId,
+      order_no: orderNo, company_id: companyId, warehouse_id: warehouseId,
       items: validItems.map(i => ({ product_id: i.product_id, unit: i.unit, price: i.price, quantity: i.quantity, remark: i.remark })),
     });
     if (res.code === 0) { message.success(res.message); setModalOpen(false); loadData(); }
@@ -110,6 +116,7 @@ export default function StockInList() {
   const orderColumns = [
     { title: '入库单号', dataIndex: 'order_no', key: 'order_no', render: v => v ? <Tag color="blue">{v}</Tag> : '-' },
     { title: '供货公司', dataIndex: 'company_name', key: 'company_name' },
+    { title: '入库库房', dataIndex: 'warehouse_name', key: 'warehouse_name', render: v => v ? <Tag color="green">{v}</Tag> : '-' },
     { title: '商品种类', dataIndex: 'item_count', key: 'item_count', render: v => `${v} 种` },
     { title: '总数量', dataIndex: 'total_qty', key: 'total_qty' },
     { title: '总金额', dataIndex: 'total_amount', key: 'total_amount', render: v => <span style={{ color: '#fa8c16', fontWeight: 600 }}>¥{v.toFixed(2)}</span> },
@@ -170,7 +177,7 @@ export default function StockInList() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="form-section" style={{ marginBottom: 0 }}>
             <div className="form-section-title">入库单信息</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px 24px', alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px 24px', alignItems: 'start' }}>
               <div>
                 <span style={{ color: '#999', fontSize: 13 }}>入库单号</span>
                 <div><Tag color="blue" style={{ fontSize: 15, padding: '4px 12px' }}>{orderNo}</Tag></div>
@@ -184,6 +191,12 @@ export default function StockInList() {
                 <Select allowClear showSearch optionFilterProp="label" placeholder="搜索选择供货公司"
                   style={{ width: '100%' }} value={companyId} onChange={setCompanyId}
                   options={companies.map(c => ({ value: c.id, label: c.name }))} />
+              </div>
+              <div>
+                <span style={{ color: '#999', fontSize: 13 }}>目标库房 <span style={{ color: '#ff4d4f' }}>*</span></span>
+                <Select allowClear showSearch optionFilterProp="label" placeholder="选择入库库房"
+                  style={{ width: '100%' }} value={warehouseId} onChange={setWarehouseId}
+                  options={warehouses.map(w => ({ value: w.id, label: w.name }))} />
               </div>
             </div>
           </div>
@@ -240,6 +253,7 @@ export default function StockInList() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, fontSize: 13 }}>
               <div>供货公司：{orderItems[0]?.company_name || '-'}</div>
+              <div>入库库房：<strong>{orderItems[0]?.warehouse_name || '-'}</strong></div>
               <div>入库人：{orderItems[0]?.operator || '-'}</div>
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -292,6 +306,7 @@ export default function StockInList() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
                 <div><span style={{ color: '#999', fontSize: 13 }}>入库单号</span><div><Tag color="blue">{itemDetail.order_no || '-'}</Tag></div></div>
                 <div><span style={{ color: '#999', fontSize: 13 }}>供货公司</span><div style={{ fontWeight: 500 }}>{itemDetail.company_name || '-'}</div></div>
+                <div><span style={{ color: '#999', fontSize: 13 }}>入库库房</span><div style={{ fontWeight: 500 }}>{itemDetail.warehouse_name || '-'}</div></div>
               </div>
             </div>
             <div className="form-section" style={{ marginBottom: 0 }}>

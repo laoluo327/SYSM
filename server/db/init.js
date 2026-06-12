@@ -40,6 +40,30 @@ function initDb() {
     )
   `);
 
+  // 库房表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS warehouses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      address TEXT DEFAULT '',
+      remark TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
+    )
+  `);
+
+  // 商品在各库房的库存表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS product_warehouse_stock (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL,
+      warehouse_id INTEGER NOT NULL,
+      quantity REAL DEFAULT 0,
+      UNIQUE(product_id, warehouse_id),
+      FOREIGN KEY (product_id) REFERENCES products(id),
+      FOREIGN KEY (warehouse_id) REFERENCES warehouses(id)
+    )
+  `);
+
   // 商品公司表
   db.exec(`
     CREATE TABLE IF NOT EXISTS companies (
@@ -106,10 +130,13 @@ function initDb() {
     )
   `);
 
-  // 迁移：给旧数据库加order_no字段
+  // 迁移：给旧数据库加字段
   const stockInCols = db.prepare("PRAGMA table_info(stock_in)").all().map(c => c.name);
   if (!stockInCols.includes('order_no')) {
     db.exec("ALTER TABLE stock_in ADD COLUMN order_no TEXT DEFAULT ''");
+  }
+  if (!stockInCols.includes('warehouse_id')) {
+    db.exec("ALTER TABLE stock_in ADD COLUMN warehouse_id INTEGER DEFAULT NULL");
   }
 
   // 出库明细表
@@ -133,10 +160,13 @@ function initDb() {
     )
   `);
 
-  // 迁移：给旧数据库加order_no字段
+  // 迁移：给旧数据库加字段
   const stockOutCols = db.prepare("PRAGMA table_info(stock_out)").all().map(c => c.name);
   if (!stockOutCols.includes('order_no')) {
     db.exec("ALTER TABLE stock_out ADD COLUMN order_no TEXT DEFAULT ''");
+  }
+  if (!stockOutCols.includes('warehouse_id')) {
+    db.exec("ALTER TABLE stock_out ADD COLUMN warehouse_id INTEGER DEFAULT NULL");
   }
 
   // 日常开销表

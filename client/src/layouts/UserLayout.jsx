@@ -4,7 +4,7 @@ import {
   DashboardOutlined, LockOutlined, ShoppingOutlined, UserOutlined,
   DollarOutlined, DatabaseOutlined, LogoutOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined,
-  ImportOutlined, ExportOutlined
+  ImportOutlined, ExportOutlined, BankOutlined
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
@@ -58,6 +58,7 @@ export default function UserLayout() {
     { key: '/user/products', icon: <ShoppingOutlined />, label: '商品列表' },
     { key: '/user/stock-in', icon: <ImportOutlined />, label: '商品入库' },
     { key: '/user/stock-out', icon: <ExportOutlined />, label: '商品出库' },
+    { key: '/user/warehouses', icon: <BankOutlined />, label: '库房列表' },
     { key: '/user/expenses', icon: <DollarOutlined />, label: '开销列表' },
     { key: '/user/data-center', icon: <DatabaseOutlined />, label: '数据中心' },
   ];

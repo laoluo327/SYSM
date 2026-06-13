@@ -171,6 +171,13 @@ export default function StockOut() {
     { title: '单价', dataIndex: 'price', key: 'price', render: v => `¥${v}` },
     { title: '数量', dataIndex: 'quantity', key: 'quantity' },
     { title: '合计金额', dataIndex: 'total_amount', key: 'total_amount', render: v => <span style={{ color: '#fa8c16', fontWeight: 600 }}>¥{v}</span> },
+    { title: '库存变动', key: 'stock_change', width: 140, render: (_, r) => (
+      <span style={{ fontSize: 13 }}>
+        <span style={{ color: '#666', fontWeight: 600 }}>{r.before_qty ?? '-'}</span>
+        <span style={{ color: '#ff4d4f', margin: '0 4px' }}>↓</span>
+        <span style={{ color: '#ff4d4f', fontWeight: 600 }}>{r.after_qty ?? '-'}</span>
+      </span>
+    )},
     { title: '详情', key: 'action', width: 80, render: (_, r) => (
       <Button size="small" type="link" icon={<EyeOutlined />} onClick={() => showItemDetail(r)}>详情</Button>
     )},

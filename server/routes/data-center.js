@@ -140,8 +140,8 @@ router.post('/import-products', adminMiddleware, upload.single('file'), (req, re
       return res.json({ code: 400, message: '未找到"商品名称"列，请检查表头' });
     }
 
-    const now = new Date();
-    const bjTime = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    const now = new Date(Date.now() + 8 * 3600 * 1000);
+    const bjTime = `${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}-${String(now.getUTCDate()).padStart(2,'0')} ${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')}:${String(now.getUTCSeconds()).padStart(2,'0')}`;
     const operator = req.user?.username || 'admin';
     const insertStmt = db.prepare('INSERT INTO products (name, spec, unit, quantity, price, remark, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
 

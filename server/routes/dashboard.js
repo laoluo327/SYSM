@@ -8,9 +8,10 @@ router.use(authMiddleware);
 // 管理员仪表盘数据
 router.get('/admin', (req, res) => {
   const db = getDb();
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
+  // 北京时间 UTC+8
+  const now = new Date(Date.now() + 8 * 3600 * 1000);
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
   const monthStr = `${year}-${month}`;
 
   // 商品总数
@@ -31,9 +32,9 @@ router.get('/admin', (req, res) => {
   // 近7天入库/出库趋势
   const trendData = [];
   for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
+    const d = new Date(Date.now() + 8 * 3600 * 1000);
+    d.setUTCDate(d.getUTCDate() - i);
+    const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
     const inTotal = db.prepare("SELECT COALESCE(SUM(total_amount), 0) as total FROM stock_in WHERE date(created_at) = ?").get(dateStr).total;
     const outTotal = db.prepare("SELECT COALESCE(SUM(total_amount), 0) as total FROM stock_out WHERE date(created_at) = ?").get(dateStr).total;
     trendData.push({ date: dateStr.substring(5), stockIn: inTotal, stockOut: outTotal });
@@ -62,9 +63,10 @@ router.get('/admin', (req, res) => {
 // 普通用户仪表盘数据
 router.get('/user', (req, res) => {
   const db = getDb();
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
+  // 北京时间 UTC+8
+  const now = new Date(Date.now() + 8 * 3600 * 1000);
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
   const monthStr = `${year}-${month}`;
   const userName = req.user.real_name;
 

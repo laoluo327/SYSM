@@ -28,7 +28,7 @@ function initDb() {
       phone TEXT DEFAULT '',
       role TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('admin', 'user')),
       is_default INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now', 'localtime'))
+      created_at TEXT DEFAULT (datetime('now', '+8 hours'))
     )
   `);
 
@@ -47,7 +47,7 @@ function initDb() {
       name TEXT NOT NULL,
       address TEXT DEFAULT '',
       remark TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now', 'localtime'))
+      created_at TEXT DEFAULT (datetime('now', '+8 hours'))
     )
   `);
 
@@ -74,7 +74,7 @@ function initDb() {
       contact TEXT DEFAULT '',
       phone TEXT DEFAULT '',
       remark TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now', 'localtime'))
+      created_at TEXT DEFAULT (datetime('now', '+8 hours'))
     )
   `);
 
@@ -88,7 +88,7 @@ function initDb() {
       contact TEXT DEFAULT '',
       phone TEXT DEFAULT '',
       remark TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now', 'localtime'))
+      created_at TEXT DEFAULT (datetime('now', '+8 hours'))
     )
   `);
 
@@ -181,7 +181,7 @@ function initDb() {
       recipient TEXT DEFAULT '',
       remark TEXT DEFAULT '',
       created_by TEXT DEFAULT '',
-      created_at TEXT DEFAULT (datetime('now', 'localtime'))
+      created_at TEXT DEFAULT (datetime('now', '+8 hours'))
     )
   `);
 

@@ -52,10 +52,10 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// 全局 API 频率限制：每个 IP 每分钟最多 120 次
+// 全局 API 频率限制：每个 IP 每分钟最多 600 次（出库需批量查库房库存，请求数较多）
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 120,
+  max: 600,
   message: { code: 429, message: '请求过于频繁，请稍后再试' },
   standardHeaders: true,
   legacyHeaders: false,

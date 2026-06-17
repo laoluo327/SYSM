@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import AdminLayout from './layouts/AdminLayout';
 import UserLayout from './layouts/UserLayout';
+import ClientLayout from './layouts/ClientLayout';
 import AdminDashboard from './pages/admin/Dashboard';
 import Settings from './pages/admin/Settings';
 import UserManage from './pages/admin/UserManage';
@@ -14,6 +15,7 @@ import StockOut from './pages/admin/StockOut';
 import Expenses from './pages/admin/Expenses';
 import DataCenter from './pages/admin/DataCenter';
 import AdminWarehouses from './pages/admin/Warehouses';
+import AdminPurchaseList from './pages/admin/PurchaseList';
 import UserDashboard from './pages/user/Dashboard';
 import ChangePassword from './pages/user/ChangePassword';
 import ProductList from './pages/user/ProductList';
@@ -22,6 +24,10 @@ import UserDataCenter from './pages/user/DataCenter';
 import UserStockInList from './pages/user/StockInList';
 import UserStockOutList from './pages/user/StockOutList';
 import UserWarehouseList from './pages/user/WarehouseList';
+import UserPurchaseList from './pages/user/PurchaseList';
+import ClientDashboard from './pages/client/Dashboard';
+import ClientPurchaseOrders from './pages/client/PurchaseOrders';
+import ClientChangePassword from './pages/client/ChangePassword';
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -46,6 +52,7 @@ function App() {
           <Route path="expenses" element={<Expenses />} />
           <Route path="data-center" element={<DataCenter />} />
           <Route path="warehouses" element={<AdminWarehouses />} />
+          <Route path="purchase" element={<AdminPurchaseList />} />
         </Route>
         <Route path="/user" element={<PrivateRoute><UserLayout /></PrivateRoute>}>
           <Route index element={<UserDashboard />} />
@@ -56,6 +63,12 @@ function App() {
           <Route path="expenses" element={<ExpenseList />} />
           <Route path="data-center" element={<UserDataCenter />} />
           <Route path="warehouses" element={<UserWarehouseList />} />
+          <Route path="purchase" element={<UserPurchaseList />} />
+        </Route>
+        <Route path="/client" element={<PrivateRoute><ClientLayout /></PrivateRoute>}>
+          <Route index element={<ClientDashboard />} />
+          <Route path="purchase" element={<ClientPurchaseOrders />} />
+          <Route path="password" element={<ClientChangePassword />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

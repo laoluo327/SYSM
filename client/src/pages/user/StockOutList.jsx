@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, InputNumber, Select, message, Card, Space, Tag } from 'antd';
-import { PlusOutlined, SearchOutlined, EyeOutlined, DeleteOutlined, PrinterOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, InputNumber, Select, message, Card, Space, Tag, Row, Col } from 'antd';
+import { PlusOutlined, SearchOutlined, EyeOutlined, DeleteOutlined, PrinterOutlined, ClockCircleOutlined, LinkOutlined, CheckCircleFilled } from '@ant-design/icons';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../../api';
+import { PRINT_STYLES } from '../../components/StockOutPrintStyles';
 
 export default function StockOutList() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const purchaseOrderNoFromUrl = searchParams.get('purchaseOrderNo') || '';
+
   const [list, setList] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -16,6 +22,7 @@ export default function StockOutList() {
   const [itemDetailOpen, setItemDetailOpen] = useState(false);
   const [itemDetail, setItemDetail] = useState(null);
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
+  const [selectedStyle, setSelectedStyle] = useState(1);
   const [keyword, setKeyword] = useState('');
   const [products, setProducts] = useState([]);
   const [clients, setClients] = useState([]);
@@ -27,6 +34,7 @@ export default function StockOutList() {
   const [items, setItems] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [createTime, setCreateTime] = useState('');
+  const [purchaseOrderNo, setPurchaseOrderNo] = useState('');
 
   const formatNow = () => {
     const d = new Date();
@@ -34,6 +42,13 @@ export default function StockOutList() {
   };
 
   useEffect(() => { loadData(); }, [page, keyword]);
+
+  // 从采购单跳转过来时自动打开新建出库单弹窗并预填数据
+  useEffect(() => {
+    if (purchaseOrderNoFromUrl) {
+      openModalWithPurchaseOrder(purchaseOrderNoFromUrl);
+    }
+  }, [purchaseOrderNoFromUrl]);
 
   const loadData = async () => {
     setLoading(true);
@@ -57,8 +72,49 @@ export default function StockOutList() {
     setWarehouseId(null);
     setWarehouseStock({});
     setItems([]);
+    setPurchaseOrderNo('');
     setCreateTime(formatNow());
     setModalOpen(true);
+  };
+
+  // 从采购单跳转过来时预填数据
+  const openModalWithPurchaseOrder = async (poNo) => {
+    const [pRes, cRes, noRes, wRes, poRes] = await Promise.all([
+      api.get('/products', { params: { pageSize: 1000 } }),
+      api.get('/clients/all'),
+      api.get('/stock-out/generate-order-no'),
+      api.get('/warehouses/all'),
+      api.get(`/purchase/${poNo}`),
+    ]);
+    if (pRes.code === 0) setProducts(pRes.data.list);
+    if (cRes.code === 0) setClients(cRes.data);
+    if (noRes.code === 0) setOrderNo(noRes.data.order_no);
+    if (wRes.code === 0) setWarehouses(wRes.data);
+    setPurchaseOrderNo(poNo);
+    setWarehouseId(null);
+    setWarehouseStock({});
+    setCreateTime(formatNow());
+    if (poRes.code === 0) {
+      const order = poRes.data.order;
+      const poItems = poRes.data.items || [];
+      // 预填客户
+      setClientId(order.client_id || null);
+      // 预填商品明细
+      setItems(poItems.map((it, idx) => ({
+        key: Date.now() + idx,
+        product_id: it.product_id,
+        unit: it.unit || '',
+        price: it.price || 0,
+        quantity: it.quantity || 0,
+        remark: '',
+      })));
+    } else {
+      setClientId(null);
+      setItems([]);
+    }
+    setModalOpen(true);
+    // 清除URL参数避免刷新重复弹窗
+    navigate('/user/stock-out', { replace: true });
   };
 
   const handleWarehouseChange = async (wId) => {
@@ -93,12 +149,13 @@ export default function StockOutList() {
 
   const handleSubmit = async () => {
     if (!clientId) { message.warning('请选择客户单位'); return; }
-    if (!warehouseId) { message.warning('请选择出货库房'); return; }
+    if (!warehouseId) { message.warning('请选择出货公司'); return; }
     const validItems = items.filter(i => i.product_id && i.quantity > 0);
     if (validItems.length === 0) { message.warning('请至少添加一条商品出库明细'); return; }
     setSubmitting(true);
     const res = await api.post('/stock-out', {
       order_no: orderNo, client_id: clientId, warehouse_id: warehouseId,
+      purchase_order_no: purchaseOrderNo || '',
       items: validItems.map(i => ({ product_id: i.product_id, unit: i.unit, price: i.price, quantity: i.quantity, remark: i.remark })),
     });
     if (res.code === 0) { message.success(res.message); setModalOpen(false); loadData(); }
@@ -116,7 +173,7 @@ export default function StockOutList() {
   };
 
   const showItemDetail = (record) => { setItemDetail(record); setItemDetailOpen(true); };
-  const openPrintPreview = () => { setPrintPreviewOpen(true); };
+  const openPrintPreview = () => { setSelectedStyle(1); setPrintPreviewOpen(true); };
   const handlePrint = () => {
     const printArea = document.getElementById('print-area');
     if (!printArea) return;
@@ -129,10 +186,13 @@ export default function StockOutList() {
     document.body.removeChild(wrapper);
   };
 
+  const CurrentStyleComp = PRINT_STYLES.find(s => s.id === selectedStyle)?.component;
+
   const orderColumns = [
     { title: '出库单号', dataIndex: 'order_no', key: 'order_no', render: v => v ? <Tag color="orange">{v}</Tag> : '-' },
+    { title: '采购单号', dataIndex: 'purchase_order_no', key: 'purchase_order_no', render: v => v ? <Tag color="blue">{v}</Tag> : '-' },
     { title: '客户单位', dataIndex: 'client_name', key: 'client_name' },
-    { title: '出货库房', dataIndex: 'warehouse_name', key: 'warehouse_name', render: v => v ? <Tag color="purple">{v}</Tag> : '-' },
+    { title: '出货公司', dataIndex: 'warehouse_name', key: 'warehouse_name', render: v => v ? <Tag color="purple">{v}</Tag> : '-' },
     { title: '商品种类', dataIndex: 'item_count', key: 'item_count', render: v => `${v} 种` },
     { title: '总数量', dataIndex: 'total_qty', key: 'total_qty' },
     { title: '总金额', dataIndex: 'total_amount', key: 'total_amount', render: v => <span style={{ color: '#fa8c16', fontWeight: 600 }}>¥{v.toFixed(2)}</span> },
@@ -207,7 +267,7 @@ export default function StockOutList() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="form-section" style={{ marginBottom: 0 }}>
             <div className="form-section-title">出库单信息</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px 24px', alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '12px 24px', alignItems: 'start' }}>
               <div>
                 <span style={{ color: '#999', fontSize: 13 }}>出库单号</span>
                 <div><Tag color="orange" style={{ fontSize: 15, padding: '4px 12px' }}>{orderNo}</Tag></div>
@@ -217,14 +277,26 @@ export default function StockOutList() {
                 <div style={{ fontWeight: 500 }}>{createTime}</div>
               </div>
               <div>
+                <span style={{ color: '#999', fontSize: 13 }}>采购单号</span>
+                <div>
+                  <Input
+                    placeholder="有则填写，无则留空"
+                    value={purchaseOrderNo}
+                    onChange={e => setPurchaseOrderNo(e.target.value)}
+                    suffix={purchaseOrderNo ? <LinkOutlined style={{ color: '#fa8c16' }} /> : null}
+                    allowClear
+                  />
+                </div>
+              </div>
+              <div>
                 <span style={{ color: '#999', fontSize: 13 }}>客户单位 <span style={{ color: '#ff4d4f' }}>*</span></span>
                 <Select allowClear showSearch optionFilterProp="label" placeholder="搜索选择客户单位"
                   style={{ width: '100%' }} value={clientId} onChange={setClientId}
                   options={clients.map(c => ({ value: c.id, label: c.name }))} />
               </div>
               <div>
-                <span style={{ color: '#999', fontSize: 13 }}>出货库房 <span style={{ color: '#ff4d4f' }}>*</span></span>
-                <Select allowClear showSearch optionFilterProp="label" placeholder="选择出货库房"
+                <span style={{ color: '#999', fontSize: 13 }}>出货公司 <span style={{ color: '#ff4d4f' }}>*</span></span>
+                <Select allowClear showSearch optionFilterProp="label" placeholder="选择出货公司"
                   style={{ width: '100%' }} value={warehouseId} onChange={handleWarehouseChange}
                   options={warehouses.map(w => ({ value: w.id, label: w.name }))} />
               </div>
@@ -249,7 +321,7 @@ export default function StockOutList() {
       </Modal>
 
       {/* 出库单详情弹窗 */}
-      <Modal title={<span>出库单详情 <Tag color="orange">{currentOrderNo}</Tag></span>} open={orderDetailOpen}
+      <Modal title={<span>出库单详情 <Tag color="orange">{currentOrderNo}</Tag>{orderItems[0]?.purchase_order_no ? <Tag color="blue" style={{ marginLeft: 8 }}>采购单: {orderItems[0].purchase_order_no}</Tag> : null}</span>} open={orderDetailOpen}
         onCancel={() => setOrderDetailOpen(false)} width={750}
         footer={<div style={{ textAlign: 'right' }}>
           <Button icon={<PrinterOutlined />} type="primary" onClick={openPrintPreview}>打印出库单</Button>
@@ -266,67 +338,44 @@ export default function StockOutList() {
       </Modal>
 
       {/* 打印预览弹窗 */}
-      <Modal title="打印预览" open={printPreviewOpen} onCancel={() => setPrintPreviewOpen(false)} width={820}
+      <Modal title="打印预览 - 选择样式" open={printPreviewOpen} onCancel={() => setPrintPreviewOpen(false)} width={900}
         footer={<div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ color: '#999', fontSize: 12 }}>提示：打印时仅打印预览区域内容</span>
+          <span style={{ color: '#999', fontSize: 12 }}>选择样式后点击打印，仅打印预览区域内容</span>
           <Space>
             <Button onClick={() => setPrintPreviewOpen(false)}>关闭</Button>
-            <Button type="primary" icon={<PrinterOutlined />} onClick={handlePrint}>开始打印</Button>
+            <Button type="primary" icon={<PrinterOutlined />} onClick={handlePrint}>打印当前样式</Button>
           </Space>
         </div>}>
-        <div id="print-scroll-wrapper" style={{ background: '#e8e8e8', padding: 20, maxHeight: '70vh', overflow: 'auto' }}>
-          <div id="print-area" style={{ background: '#fff', padding: '40px 50px', maxWidth: 720, margin: '0 auto', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-            <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <h2 style={{ margin: 0, fontSize: 22, letterSpacing: 8 }}>出 库 单</h2>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, fontSize: 13 }}>
-              <div>出库单号：<strong>{currentOrderNo}</strong></div>
-              <div>出库时间：{orderItems[0]?.created_at || ''}</div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, fontSize: 13 }}>
-              <div>客户单位：{orderItems[0]?.client_name || '-'}</div>
-              <div>出货库房：<strong>{orderItems[0]?.warehouse_name || '-'}</strong></div>
-              <div>出库人：{orderItems[0]?.operator || '-'}</div>
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: '#f5f5f5' }}>
-                  <th style={{ border: '1px solid #d9d9d9', padding: '8px 10px', textAlign: 'center' }}>序号</th>
-                  <th style={{ border: '1px solid #d9d9d9', padding: '8px 10px', textAlign: 'left' }}>商品名称</th>
-                  <th style={{ border: '1px solid #d9d9d9', padding: '8px 10px', textAlign: 'center' }}>单位</th>
-                  <th style={{ border: '1px solid #d9d9d9', padding: '8px 10px', textAlign: 'right' }}>单价</th>
-                  <th style={{ border: '1px solid #d9d9d9', padding: '8px 10px', textAlign: 'right' }}>数量</th>
-                  <th style={{ border: '1px solid #d9d9d9', padding: '8px 10px', textAlign: 'right' }}>合计金额</th>
-                  <th style={{ border: '1px solid #d9d9d9', padding: '8px 10px', textAlign: 'left' }}>备注</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orderItems.map((item, idx) => (
-                  <tr key={item.id}>
-                    <td style={{ border: '1px solid #d9d9d9', padding: '6px 10px', textAlign: 'center' }}>{idx + 1}</td>
-                    <td style={{ border: '1px solid #d9d9d9', padding: '6px 10px' }}>{item.product_name}</td>
-                    <td style={{ border: '1px solid #d9d9d9', padding: '6px 10px', textAlign: 'center' }}>{item.unit}</td>
-                    <td style={{ border: '1px solid #d9d9d9', padding: '6px 10px', textAlign: 'right' }}>¥{item.price}</td>
-                    <td style={{ border: '1px solid #d9d9d9', padding: '6px 10px', textAlign: 'right' }}>{item.quantity}</td>
-                    <td style={{ border: '1px solid #d9d9d9', padding: '6px 10px', textAlign: 'right', fontWeight: 600 }}>¥{item.total_amount}</td>
-                    <td style={{ border: '1px solid #d9d9d9', padding: '6px 10px' }}>{item.remark || ''}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{ background: '#fafafa', fontWeight: 700 }}>
-                  <td colSpan={5} style={{ border: '1px solid #d9d9d9', padding: '8px 10px', textAlign: 'right' }}>本单合计：</td>
-                  <td style={{ border: '1px solid #d9d9d9', padding: '8px 10px', textAlign: 'right', color: '#fa8c16' }}>¥{orderTotal.toFixed(2)}</td>
-                  <td style={{ border: '1px solid #d9d9d9', padding: '8px 10px' }}></td>
-                </tr>
-              </tfoot>
-            </table>
-            <div style={{ marginTop: 40, display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-              <div>制单人：__________</div>
-              <div>领货人：__________</div>
-              <div>日期：__________</div>
-            </div>
-          </div>
+        {/* 样式选择区 */}
+        <div style={{ marginBottom: 16 }}>
+          <Row gutter={8}>
+            {PRINT_STYLES.map(s => (
+              <Col key={s.id} span={4}>
+                <Card
+                  size="small"
+                  hoverable
+                  onClick={() => setSelectedStyle(s.id)}
+                  style={{
+                    cursor: 'pointer',
+                    border: selectedStyle === s.id ? `2px solid ${s.color}` : '1px solid #e8e8e8',
+                    background: selectedStyle === s.id ? `${s.color}08` : '#fff',
+                    textAlign: 'center',
+                    padding: '4px 0',
+                  }}
+                  bodyStyle={{ padding: '8px 4px' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: 2, background: s.color, flexShrink: 0 }}></div>
+                    <span style={{ fontSize: 13, fontWeight: selectedStyle === s.id ? 700 : 400 }}>{s.name}</span>
+                  </div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </div>
+        {/* 预览区 */}
+        <div style={{ background: '#e8e8e8', padding: 20, maxHeight: '60vh', overflow: 'auto', borderRadius: 8 }}>
+          {CurrentStyleComp && <CurrentStyleComp orderItems={orderItems} currentOrderNo={currentOrderNo} orderTotal={orderTotal} />}
         </div>
       </Modal>
 
@@ -338,8 +387,9 @@ export default function StockOutList() {
               <div className="form-section-title">出库单信息</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
                 <div><span style={{ color: '#999', fontSize: 13 }}>出库单号</span><div><Tag color="orange">{itemDetail.order_no || '-'}</Tag></div></div>
+                <div><span style={{ color: '#999', fontSize: 13 }}>采购单号</span><div>{itemDetail.purchase_order_no ? <Tag color="blue">{itemDetail.purchase_order_no}</Tag> : '-'}</div></div>
                 <div><span style={{ color: '#999', fontSize: 13 }}>客户单位</span><div style={{ fontWeight: 500 }}>{itemDetail.client_name || '-'}</div></div>
-                <div><span style={{ color: '#999', fontSize: 13 }}>出货库房</span><div style={{ fontWeight: 500 }}>{itemDetail.warehouse_name || '-'}</div></div>
+                <div><span style={{ color: '#999', fontSize: 13 }}>出货公司</span><div style={{ fontWeight: 500 }}>{itemDetail.warehouse_name || '-'}</div></div>
               </div>
             </div>
             <div className="form-section" style={{ marginBottom: 0 }}>

@@ -47,7 +47,7 @@ router.get('/', (req, res) => {
     ${where}
   `).get(...params).count;
   const list = db.prepare(`
-    SELECT so.order_no, cl.name as client_name,
+    SELECT so.order_no, so.purchase_order_no, cl.name as client_name,
       w.name as warehouse_name,
       SUM(so.quantity) as total_qty, SUM(so.total_amount) as total_amount,
       COUNT(*) as item_count, so.operator, MIN(so.created_at) as created_at
@@ -108,7 +108,7 @@ router.get('/items', (req, res) => {
 
 // 批量出库（同一出库单号下多条商品）
 router.post('/', (req, res) => {
-  const { order_no, client_id, warehouse_id, items } = req.body;
+  const { order_no, client_id, warehouse_id, items, purchase_order_no } = req.body;
   if (!order_no) {
     return res.json({ code: 400, message: '出库单号缺失' });
   }
@@ -116,7 +116,7 @@ router.post('/', (req, res) => {
     return res.json({ code: 400, message: '请选择客户单位' });
   }
   if (!warehouse_id) {
-    return res.json({ code: 400, message: '请选择出货库房' });
+    return res.json({ code: 400, message: '请选择出货公司' });
   }
   if (!Array.isArray(items) || items.length === 0) {
     return res.json({ code: 400, message: '请至少添加一条商品出库明细' });
@@ -124,11 +124,24 @@ router.post('/', (req, res) => {
 
   const db = getDb();
 
-  // 验证库房存在
+  // 验证出货公司存在
   const warehouse = db.prepare('SELECT id FROM warehouses WHERE id = ?').get(warehouse_id);
   if (!warehouse) {
-    return res.json({ code: 400, message: '选择的库房不存在' });
+    return res.json({ code: 400, message: '出货公司不存在' });
   }
+
+  // 如果关联了采购单号，验证采购单状态
+  if (purchase_order_no) {
+    const po = db.prepare('SELECT * FROM purchase_orders WHERE order_no = ?').get(purchase_order_no);
+    if (!po) {
+      return res.json({ code: 400, message: '关联的采购单不存在' });
+    }
+    if (po.status !== 'pending') {
+      return res.json({ code: 400, message: '关联的采购单不是待备货状态，无法出库备货' });
+    }
+  }
+
+  const operator = req.user.real_name || req.user.username;
 
   const transaction = db.transaction(() => {
     for (const item of items) {
@@ -140,35 +153,44 @@ router.post('/', (req, res) => {
       if (!product) {
         throw new Error(`商品ID ${product_id} 不存在`);
       }
-      // 检查该库房库存
+      // 检查该出货公司库存
       const whStock = db.prepare('SELECT quantity FROM product_warehouse_stock WHERE product_id = ? AND warehouse_id = ?')
         .get(product_id, warehouse_id);
       const whQty = whStock ? whStock.quantity : 0;
       if (whQty < quantity) {
-        throw new Error(`【${product.name}】在该库房库存不足，当前库存: ${whQty}`);
+        throw new Error(`【${product.name}】在该出货公司库存不足，当前库存: ${whQty}`);
       }
       const before_qty = product.quantity;
       const after_qty = before_qty - quantity;
       const total_amount = price * quantity;
 
       db.prepare(`
-        INSERT INTO stock_out (order_no, product_id, client_id, warehouse_id, unit, price, quantity, before_qty, after_qty, total_amount, remark, operator)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(order_no, product_id, client_id, warehouse_id, unit || product.unit, price || product.price, quantity, before_qty, after_qty, total_amount, remark || '', req.user.real_name);
+        INSERT INTO stock_out (order_no, product_id, client_id, warehouse_id, unit, price, quantity, before_qty, after_qty, total_amount, remark, operator, purchase_order_no)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(order_no, product_id, client_id, warehouse_id, unit || product.unit, price || product.price, quantity, before_qty, after_qty, total_amount, remark || '', operator, purchase_order_no || '');
 
       // 更新总库存
       db.prepare('UPDATE products SET quantity = ? WHERE id = ?').run(after_qty, product_id);
 
-      // 减少库房库存
+      // 减少出货公司库存
       db.prepare(`
         UPDATE product_warehouse_stock SET quantity = quantity - ? WHERE product_id = ? AND warehouse_id = ?
       `).run(quantity, product_id, warehouse_id);
+    }
+
+    // 如果关联了采购单号，自动更新采购单状态为备货中
+    if (purchase_order_no) {
+      db.prepare(`UPDATE purchase_orders SET status = 'preparing', preparing_by = ?, preparing_at = datetime('now', '+8 hours'), updated_at = datetime('now', '+8 hours') WHERE order_no = ?`)
+        .run(operator, purchase_order_no);
     }
   });
 
   try {
     transaction();
-    res.json({ code: 0, message: `出库成功，共 ${items.length} 条商品` });
+    const msg = purchase_order_no
+      ? `出库成功，共 ${items.length} 条商品，采购单 ${purchase_order_no} 已变为备货中`
+      : `出库成功，共 ${items.length} 条商品`;
+    res.json({ code: 0, message: msg });
   } catch (e) {
     res.json({ code: 500, message: e.message });
   }

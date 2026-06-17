@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: server/inventory
+title: 库存与仓储管理
+scope:
+    - server/routes/stock-in.js
+    - server/routes/stock-out.js
+    - server/routes/products.js
+    - server/routes/warehouses.js
+source_files: []
+depends_on: []
+related_to:
+    - path: client

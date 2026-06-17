@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Row, Col, Upload, Modal, List, message, Popconfirm, Divider, Space } from 'antd';
+import { Card, Button, Row, Col, Upload, Modal, List, message, Popconfirm, Divider, Space, DatePicker } from 'antd';
 import {
   DownloadOutlined, CloudUploadOutlined, CloudDownloadOutlined,
   ReloadOutlined, DatabaseOutlined, UploadOutlined, DeleteOutlined,
   ImportOutlined
 } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import api from '../../api';
+
+const { RangePicker } = DatePicker;
 
 export default function DataCenter() {
   const [backups, setBackups] = useState([]);
+  const [dateRange, setDateRange] = useState(null); // [startDate, endDate]
 
   useEffect(() => { loadBackups(); }, []);
 
@@ -20,21 +24,60 @@ export default function DataCenter() {
   const exportData = async (type) => {
     const token = localStorage.getItem('token');
     try {
-      const resp = await fetch(`/api/data-center/export/${type}`, {
+      // 构建 URL 参数
+      const params = new URLSearchParams();
+      if (dateRange && dateRange[0] && dateRange[1]) {
+        params.append('startDate', dateRange[0].format('YYYY-MM-DD'));
+        params.append('endDate', dateRange[1].format('YYYY-MM-DD'));
+      }
+      
+      const apiUrl = `/api/data-center/export/${type}?${params.toString()}`;
+      
+      const resp = await fetch(apiUrl, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      
+      if (!resp.ok) {
+        message.error('导出失败：' + resp.statusText);
+        return;
+      }
+      
       const blob = await resp.blob();
+      
+      // 检查返回的是否是错误信息（JSON）
+      if (blob.type.includes('application/json')) {
+        const text = await blob.text();
+        const error = JSON.parse(text);
+        message.error('导出失败：' + (error.message || '未知错误'));
+        return;
+      }
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${type}.xlsx`;
+      
+      // 根据类型设置中文文件名
+      const fileNames = {
+        'products': '商品明细.xlsx',
+        'stock-in': '入库明细.xlsx',
+        'stock-out': '出库明细.xlsx',
+        'expenses': '开销明细.xlsx'
+      };
+      const baseName = fileNames[type] || `${type}.xlsx`;
+      // 如果有时间范围，添加到文件名中
+      const fileName = dateRange && dateRange[0] && dateRange[1]
+        ? `${baseName.replace('.xlsx', '')}_${dateRange[0].format('YYYYMMDD')}_${dateRange[1].format('YYYYMMDD')}.xlsx`
+        : baseName;
+      a.download = fileName;
+      
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       message.success('导出成功');
     } catch (e) {
-      message.error('导出失败');
+      console.error('导出错误:', e);
+      message.error('导出失败：' + e.message);
     }
   };
 
@@ -68,6 +111,23 @@ export default function DataCenter() {
       <div className="page-header"><h2 className="page-title">数据中心</h2></div>
 
       <Card title="数据导出" bordered={false} style={{ borderRadius: 12, marginBottom: 20 }}>
+        <div style={{ marginBottom: 16 }}>
+          <Space>
+            <span>时间范围：</span>
+            <RangePicker
+              value={dateRange}
+              onChange={setDateRange}
+              placeholder={['开始日期', '结束日期']}
+              style={{ width: 280 }}
+            />
+            {dateRange && (
+              <Button size="small" onClick={() => setDateRange(null)}>清空</Button>
+            )}
+          </Space>
+          <div style={{ marginTop: 8, color: '#999', fontSize: 12 }}>
+            提示：选择时间范围后，将只导出该时间段内的数据。不选则导出全部数据。
+          </div>
+        </div>
         <Row gutter={[16, 16]}>
           {exportItems.map(item => (
             <Col key={item.key}>

@@ -77,7 +77,7 @@ export default function StockInList() {
 
   const handleSubmit = async () => {
     if (!companyId) { message.warning('请选择供货公司'); return; }
-    if (!warehouseId) { message.warning('请选择目标库房'); return; }
+    if (!warehouseId) { message.warning('请选择出货公司'); return; }
     const validItems = items.filter(i => i.product_id && i.quantity > 0);
     if (validItems.length === 0) { message.warning('请至少添加一条商品入库明细'); return; }
     setSubmitting(true);
@@ -116,7 +116,7 @@ export default function StockInList() {
   const orderColumns = [
     { title: '入库单号', dataIndex: 'order_no', key: 'order_no', render: v => v ? <Tag color="blue">{v}</Tag> : '-' },
     { title: '供货公司', dataIndex: 'company_name', key: 'company_name' },
-    { title: '入库库房', dataIndex: 'warehouse_name', key: 'warehouse_name', render: v => v ? <Tag color="green">{v}</Tag> : '-' },
+    { title: '出货公司', dataIndex: 'warehouse_name', key: 'warehouse_name', render: v => v ? <Tag color="green">{v}</Tag> : '-' },
     { title: '商品种类', dataIndex: 'item_count', key: 'item_count', render: v => `${v} 种` },
     { title: '总数量', dataIndex: 'total_qty', key: 'total_qty' },
     { title: '总金额', dataIndex: 'total_amount', key: 'total_amount', render: v => <span style={{ color: '#fa8c16', fontWeight: 600 }}>¥{v.toFixed(2)}</span> },
@@ -200,8 +200,8 @@ export default function StockInList() {
                   options={companies.map(c => ({ value: c.id, label: c.name }))} />
               </div>
               <div>
-                <span style={{ color: '#999', fontSize: 13 }}>目标库房 <span style={{ color: '#ff4d4f' }}>*</span></span>
-                <Select allowClear showSearch optionFilterProp="label" placeholder="选择入库库房"
+                <span style={{ color: '#999', fontSize: 13 }}>出货公司 <span style={{ color: '#ff4d4f' }}>*</span></span>
+                <Select allowClear showSearch optionFilterProp="label" placeholder="选择出货公司"
                   style={{ width: '100%' }} value={warehouseId} onChange={setWarehouseId}
                   options={warehouses.map(w => ({ value: w.id, label: w.name }))} />
               </div>
@@ -260,7 +260,7 @@ export default function StockInList() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, fontSize: 13 }}>
               <div>供货公司：{orderItems[0]?.company_name || '-'}</div>
-              <div>入库库房：<strong>{orderItems[0]?.warehouse_name || '-'}</strong></div>
+              <div>出货公司：<strong>{orderItems[0]?.warehouse_name || '-'}</strong></div>
               <div>入库人：{orderItems[0]?.operator || '-'}</div>
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -313,7 +313,7 @@ export default function StockInList() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
                 <div><span style={{ color: '#999', fontSize: 13 }}>入库单号</span><div><Tag color="blue">{itemDetail.order_no || '-'}</Tag></div></div>
                 <div><span style={{ color: '#999', fontSize: 13 }}>供货公司</span><div style={{ fontWeight: 500 }}>{itemDetail.company_name || '-'}</div></div>
-                <div><span style={{ color: '#999', fontSize: 13 }}>入库库房</span><div style={{ fontWeight: 500 }}>{itemDetail.warehouse_name || '-'}</div></div>
+                <div><span style={{ color: '#999', fontSize: 13 }}>出货公司</span><div style={{ fontWeight: 500 }}>{itemDetail.warehouse_name || '-'}</div></div>
               </div>
             </div>
             <div className="form-section" style={{ marginBottom: 0 }}>

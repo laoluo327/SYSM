@@ -116,7 +116,7 @@ router.post('/', (req, res) => {
     return res.json({ code: 400, message: '请选择供货公司' });
   }
   if (!warehouse_id) {
-    return res.json({ code: 400, message: '请选择入库库房' });
+    return res.json({ code: 400, message: '请选择出货公司' });
   }
   if (!Array.isArray(items) || items.length === 0) {
     return res.json({ code: 400, message: '请至少添加一条商品入库明细' });
@@ -124,10 +124,10 @@ router.post('/', (req, res) => {
 
   const db = getDb();
 
-  // 验证库房存在
+  // 验证出货公司存在
   const warehouse = db.prepare('SELECT id FROM warehouses WHERE id = ?').get(warehouse_id);
   if (!warehouse) {
-    return res.json({ code: 400, message: '选择的库房不存在' });
+    return res.json({ code: 400, message: '出货公司不存在' });
   }
 
   const transaction = db.transaction(() => {
@@ -152,7 +152,7 @@ router.post('/', (req, res) => {
       // 更新总库存
       db.prepare('UPDATE products SET quantity = ? WHERE id = ?').run(after_qty, product_id);
 
-      // 更新库房库存（upsert）
+      // 更新出货公司库存（upsert）
       db.prepare(`
         INSERT INTO product_warehouse_stock (product_id, warehouse_id, quantity)
         VALUES (?, ?, ?)

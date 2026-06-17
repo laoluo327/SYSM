@@ -25,4 +25,18 @@ function adminMiddleware(req, res, next) {
   next();
 }
 
-module.exports = { authMiddleware, adminMiddleware, JWT_SECRET };
+function staffMiddleware(req, res, next) {
+  if (req.user.role !== 'admin' && req.user.role !== 'user') {
+    return res.status(403).json({ code: 403, message: '权限不足，需要工作人员权限' });
+  }
+  next();
+}
+
+function clientMiddleware(req, res, next) {
+  if (req.user.role !== 'client') {
+    return res.status(403).json({ code: 403, message: '权限不足，需要客户权限' });
+  }
+  next();
+}
+
+module.exports = { authMiddleware, adminMiddleware, staffMiddleware, clientMiddleware, JWT_SECRET };

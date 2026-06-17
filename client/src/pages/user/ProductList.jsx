@@ -128,8 +128,8 @@ export default function ProductList() {
               <Select allowClear showSearch optionFilterProp="label" placeholder="搜索选择供货公司"
                 options={companies.map(c => ({ value: c.id, label: c.name }))} />
             </Form.Item>
-            <Form.Item name="warehouse_id" label="目标库房" rules={[{ required: true, message: '请选择库房' }]}>
-              <Select allowClear showSearch optionFilterProp="label" placeholder="选择入库库房"
+            <Form.Item name="warehouse_id" label="目标出货公司" rules={[{ required: true, message: '请选择出货公司' }]}>
+              <Select allowClear showSearch optionFilterProp="label" placeholder="出货公司"
                 options={warehouses.map(w => ({ value: w.id, label: w.name }))} />
             </Form.Item>
             <Space size="large">
@@ -155,8 +155,8 @@ export default function ProductList() {
               <Select allowClear showSearch optionFilterProp="label" placeholder="搜索选择客户单位"
                 options={clients.map(c => ({ value: c.id, label: c.name }))} />
             </Form.Item>
-            <Form.Item name="warehouse_id" label="出货库房" rules={[{ required: true, message: '请选择库房' }]}>
-              <Select allowClear showSearch optionFilterProp="label" placeholder="选择出货库房"
+            <Form.Item name="warehouse_id" label="出货公司" rules={[{ required: true, message: '请选择出货公司' }]}>
+              <Select allowClear showSearch optionFilterProp="label" placeholder="选择出货公司"
                 options={warehouses.map(w => ({ value: w.id, label: w.name }))} />
             </Form.Item>
             <Space size="large">
@@ -201,7 +201,7 @@ export default function ProductList() {
             </div>
             {warehouseStock.length > 0 && (
               <div className="form-section" style={{ marginBottom: 0 }}>
-                <div className="form-section-title"><BankOutlined /> 库房库存分布</div>
+                <div className="form-section-title"><BankOutlined /> 出货公司库存分布</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
                   {warehouseStock.map(w => (
                     <Card key={w.id} size="small" style={{ textAlign: 'center', background: w.quantity > 0 ? '#f0f5ff' : '#fafafa', border: `1px solid ${w.quantity > 0 ? '#adc6ff' : '#d9d9d9'}` }}>

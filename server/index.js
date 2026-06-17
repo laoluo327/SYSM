@@ -24,6 +24,8 @@ app.use(cors({
     const allowed = [
       `http://localhost:${PORT}`,
       `http://127.0.0.1:${PORT}`,
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
       'https://sysm.onrender.com',
       ...extra,
     ];
@@ -52,7 +54,7 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// 全局 API 频率限制：每个 IP 每分钟最多 600 次（出库需批量查库房库存，请求数较多）
+// 全局 API 频率限制：每个 IP 每分钟最多 600 次（出库需批量查出货公司库存，请求数较多）
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 600,
@@ -78,6 +80,7 @@ const expenseRoutes = require('./routes/expenses');
 const dashboardRoutes = require('./routes/dashboard');
 const dataCenterRoutes = require('./routes/data-center');
 const warehouseRoutes = require('./routes/warehouses');
+const purchaseRoutes = require('./routes/purchase');
 
 // 注册路由（登录接口单独加频率限制）
 app.use('/api/auth/login', loginLimiter);
@@ -93,6 +96,7 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/data-center', dataCenterRoutes);
 app.use('/api/warehouses', warehouseRoutes);
+app.use('/api/purchase', purchaseRoutes);
 
 // 静态文件托管（生产环境）
 app.use(express.static(path.join(__dirname, '..', 'dist')));

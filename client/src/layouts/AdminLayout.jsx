@@ -4,7 +4,7 @@ import {
   DashboardOutlined, SettingOutlined, UserOutlined, ShopOutlined,
   TeamOutlined, ShoppingOutlined, ImportOutlined, ExportOutlined,
   DollarOutlined, DatabaseOutlined, LogoutOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
-  BankOutlined
+  BankOutlined, FileTextOutlined
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
@@ -63,8 +63,9 @@ export default function AdminLayout() {
     { key: '/admin/products', icon: <ShoppingOutlined />, label: '商品列表' },
     { key: '/admin/stock-in', icon: <ImportOutlined />, label: '商品入库' },
     { key: '/admin/stock-out', icon: <ExportOutlined />, label: '商品出库' },
-    { key: '/admin/warehouses', icon: <BankOutlined />, label: '库房管理' },
+    { key: '/admin/warehouses', icon: <BankOutlined />, label: '出货公司' },
     { key: '/admin/expenses', icon: <DollarOutlined />, label: '日常开销' },
+    { key: '/admin/purchase', icon: <FileTextOutlined />, label: '采购申请' },
     { key: '/admin/data-center', icon: <DatabaseOutlined />, label: '数据中心' },
   ];
 

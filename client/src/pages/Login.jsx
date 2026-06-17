@@ -13,7 +13,8 @@ export default function Login() {
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (token && user.role) {
-      navigate(user.role === 'admin' ? '/admin' : '/user');
+      const rolePath = { admin: '/admin', user: '/user', client: '/client' };
+      navigate(rolePath[user.role] || '/login');
     }
     // 获取系统名称（公开接口）
     fetch('/api/settings/system-name').then(r => r.json()).then(res => {
@@ -32,7 +33,7 @@ export default function Login() {
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
         message.success('登录成功');
-        navigate(res.data.user.role === 'admin' ? '/admin' : '/user');
+        navigate(res.data.user.role === 'admin' ? '/admin' : res.data.user.role === 'client' ? '/client' : '/user');
       } else {
         message.error(res.message || '登录失败');
       }

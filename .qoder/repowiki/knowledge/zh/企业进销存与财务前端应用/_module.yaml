@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: client
+title: 企业进销存与财务前端应用
+scope:
+    - client/
+source_files: []
+depends_on: []
+related_to:
+    - path: server/inventory
+    - path: server/business_ops

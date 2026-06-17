@@ -1,0 +1,14 @@
+schema_version: 1
+module_path: server/business_ops
+title: 业务运营与系统管理路由
+scope:
+    - server/routes/clients.js
+    - server/routes/companies.js
+    - server/routes/expenses.js
+    - server/routes/dashboard.js
+    - server/routes/settings.js
+    - server/routes/users.js
+source_files: []
+depends_on: []
+related_to:
+    - path: client

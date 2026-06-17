@@ -98,10 +98,10 @@ export default function StockIn() {
     setSubmitting(true);
     const [resolvedCompanyId, resolvedWarehouseId] = await Promise.all([
       resolveEntity(companyValue, setCompanies, '/companies/find-or-create', '供货公司'),
-      resolveEntity(warehouseValue, setWarehouses, '/warehouses/find-or-create', '目标库房'),
+      resolveEntity(warehouseValue, setWarehouses, '/warehouses/find-or-create', '出货公司'),
     ]);
     if (!resolvedCompanyId) { message.warning('请选择或输入供货公司'); setSubmitting(false); return; }
-    if (!resolvedWarehouseId) { message.warning('请选择或输入目标库房'); setSubmitting(false); return; }
+    if (!resolvedWarehouseId) { message.warning('请选择或输入出货公司'); setSubmitting(false); return; }
     const res = await api.post('/stock-in', {
       order_no: orderNo, company_id: resolvedCompanyId, warehouse_id: resolvedWarehouseId,
       items: validItems.map(i => ({ product_id: i.product_id, unit: i.unit, price: i.price, quantity: i.quantity, remark: i.remark })),
@@ -138,7 +138,7 @@ export default function StockIn() {
   const orderColumns = [
     { title: '入库单号', dataIndex: 'order_no', key: 'order_no', render: v => v ? <Tag color="blue">{v}</Tag> : '-' },
     { title: '供货公司', dataIndex: 'company_name', key: 'company_name' },
-    { title: '入库库房', dataIndex: 'warehouse_name', key: 'warehouse_name', render: v => v ? <Tag color="green">{v}</Tag> : '-' },
+    { title: '出货公司', dataIndex: 'warehouse_name', key: 'warehouse_name', render: v => v ? <Tag color="green">{v}</Tag> : '-' },
     { title: '商品种类', dataIndex: 'item_count', key: 'item_count', render: v => `${v} 种` },
     { title: '总数量', dataIndex: 'total_qty', key: 'total_qty' },
     { title: '总金额', dataIndex: 'total_amount', key: 'total_amount', render: v => <span style={{ color: '#fa8c16', fontWeight: 600 }}>¥{v.toFixed(2)}</span> },
@@ -240,9 +240,9 @@ export default function StockIn() {
                 />
               </div>
               <div>
-                <span style={{ color: '#999', fontSize: 13 }}>目标库房 <span style={{ color: '#ff4d4f' }}>*</span></span>
+                <span style={{ color: '#999', fontSize: 13 }}>目标出货公司 <span style={{ color: '#ff4d4f' }}>*</span></span>
                 <Select
-                  allowClear showSearch placeholder="搜索或输入新库房名"
+                  allowClear showSearch placeholder="搜索或输入出货公司名"
                   style={{ width: '100%' }}
                   value={warehouseValue}
                   onChange={v => setWarehouseValue(v ?? null)}
@@ -254,7 +254,7 @@ export default function StockIn() {
                       <div style={{ padding: '4px 0', color: '#1677ff' }}>
                         ✚ 将自动创建「{warehouseValue.trim()}」
                       </div>
-                    ) : '无匹配库房'
+                    ) : '无匹配出货公司'
                   }
                   options={warehouses.map(w => ({ value: w.id, label: w.name }))}
                 />
@@ -316,7 +316,7 @@ export default function StockIn() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, fontSize: 13 }}>
               <div>供货公司：{orderItems[0]?.company_name || '-'}</div>
-              <div>入库库房：<strong>{orderItems[0]?.warehouse_name || '-'}</strong></div>
+              <div>入库出货公司：<strong>{orderItems[0]?.warehouse_name || '-'}</strong></div>
               <div>入库人：{orderItems[0]?.operator || '-'}</div>
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -370,7 +370,7 @@ export default function StockIn() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px' }}>
                 <div><span style={{ color: '#999', fontSize: 13 }}>入库单号</span><div><Tag color="blue">{itemDetail.order_no || '-'}</Tag></div></div>
                 <div><span style={{ color: '#999', fontSize: 13 }}>供货公司</span><div style={{ fontWeight: 500 }}>{itemDetail.company_name || '-'}</div></div>
-                <div><span style={{ color: '#999', fontSize: 13 }}>入库库房</span><div style={{ fontWeight: 500 }}>{itemDetail.warehouse_name || '-'}</div></div>
+                <div><span style={{ color: '#999', fontSize: 13 }}>出货公司</span><div style={{ fontWeight: 500 }}>{itemDetail.warehouse_name || '-'}</div></div>
               </div>
             </div>
             <div className="form-section" style={{ marginBottom: 0 }}>

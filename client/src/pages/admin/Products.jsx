@@ -114,7 +114,7 @@ export default function Products() {
             </div>
             {warehouseStock.length > 0 && (
               <div className="form-section" style={{ marginBottom: 0 }}>
-                <div className="form-section-title"><BankOutlined /> 库房库存分布</div>
+                <div className="form-section-title"><BankOutlined /> 出货公司库存分布</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
                   {warehouseStock.map(w => (
                     <Card key={w.id} size="small" style={{ textAlign: 'center', background: w.quantity > 0 ? '#f0f5ff' : '#fafafa', border: `1px solid ${w.quantity > 0 ? '#adc6ff' : '#d9d9d9'}` }}>

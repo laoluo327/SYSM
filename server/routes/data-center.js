@@ -27,69 +27,109 @@ const upload = multer({
 
 // 导出Excel（仅管理员）
 router.get('/export/:type', adminMiddleware, (req, res) => {
-  const { type } = req.params;
-  const db = getDb();
-  let data = [];
-  let filename = '';
-  let headers = [];
+  try {
+    const { type } = req.params;
+    const { startDate, endDate } = req.query;
+    const db = getDb();
+    let data = [];
+    let filename = '';
+    let headers = [];
 
-  switch (type) {
-    case 'products':
-      filename = '商品明细';
-      headers = ['ID', '商品名称', '采购公司', '规格', '单位', '数量', '单价', '备注', '记录人', '记录时间'];
-      const products = db.prepare(`
-        SELECT p.*, c.name as company_name FROM products p 
-        LEFT JOIN companies c ON p.company_id = c.id ORDER BY p.id ASC
-      `).all();
-      data = products.map(p => [p.id, p.name, p.company_name || '', p.spec, p.unit, p.quantity, p.price, p.remark, p.created_by, p.created_at]);
-      break;
-    case 'stock-in':
-      filename = '入库明细';
-      headers = ['ID', '入库单号', '商品名称', '供货公司', '入库库房', '单位', '单价', '数量', '入库前数量', '入库后数量', '合计金额', '备注', '入库人', '入库时间'];
-      const stockIn = db.prepare(`
-        SELECT si.*, p.name as product_name, c.name as company_name,
-          w.name as warehouse_name
-        FROM stock_in si 
-        LEFT JOIN products p ON si.product_id = p.id 
-        LEFT JOIN companies c ON si.company_id = c.id 
-        LEFT JOIN warehouses w ON si.warehouse_id = w.id
-        ORDER BY si.id ASC
-      `).all();
-      data = stockIn.map(s => [s.id, s.order_no, s.product_name, s.company_name || '', s.warehouse_name || '', s.unit, s.price, s.quantity, s.before_qty, s.after_qty, s.total_amount, s.remark, s.operator, s.created_at]);
-      break;
-    case 'stock-out':
-      filename = '出库明细';
-      headers = ['ID', '出库单号', '商品名称', '客户单位', '出货库房', '单位', '单价', '数量', '出库前数量', '出库后数量', '合计金额', '备注', '出库人', '出库时间'];
-      const stockOut = db.prepare(`
-        SELECT so.*, p.name as product_name, cl.name as client_name,
-          w.name as warehouse_name
-        FROM stock_out so 
-        LEFT JOIN products p ON so.product_id = p.id 
-        LEFT JOIN clients cl ON so.client_id = cl.id 
-        LEFT JOIN warehouses w ON so.warehouse_id = w.id
-        ORDER BY so.id ASC
-      `).all();
-      data = stockOut.map(s => [s.id, s.order_no, s.product_name, s.client_name || '', s.warehouse_name || '', s.unit, s.price, s.quantity, s.before_qty, s.after_qty, s.total_amount, s.remark, s.operator, s.created_at]);
-      break;
-    case 'expenses':
-      filename = '开销明细';
-      headers = ['ID', '开销名称', '分类', '支付方式', '支付金额', '支付人', '加给谁', '备注', '记录人', '记录时间'];
-      const expenses = db.prepare('SELECT * FROM expenses ORDER BY id ASC').all();
-      data = expenses.map(e => [e.id, e.name, e.category, e.pay_method, e.amount, e.payer, e.recipient, e.remark, e.created_by, e.created_at]);
-      break;
-    default:
-      return res.json({ code: 400, message: '不支持的导出类型' });
+    // 构建时间过滤条件（根据不同表使用不同别名）
+    let timeFilterProducts = '';
+    let timeFilterStockIn = '';
+    let timeFilterStockOut = '';
+    let timeFilterExpenses = '';
+    if (startDate && endDate) {
+      timeFilterProducts = `AND p.created_at >= '${startDate} 00:00:00' AND p.created_at <= '${endDate} 23:59:59'`;
+      timeFilterStockIn = `AND si.created_at >= '${startDate} 00:00:00' AND si.created_at <= '${endDate} 23:59:59'`;
+      timeFilterStockOut = `AND so.created_at >= '${startDate} 00:00:00' AND so.created_at <= '${endDate} 23:59:59'`;
+      timeFilterExpenses = `AND created_at >= '${startDate} 00:00:00' AND created_at <= '${endDate} 23:59:59'`;
+    }
+
+    switch (type) {
+      case 'products':
+        filename = '商品明细';
+        headers = ['ID', '商品名称', '采购公司', '规格', '单位', '数量', '单价', '备注', '记录人', '记录时间'];
+        const products = db.prepare(`
+          SELECT p.*, c.name as company_name FROM products p 
+          LEFT JOIN companies c ON p.company_id = c.id 
+          WHERE 1=1 ${timeFilterProducts}
+          ORDER BY p.id ASC
+        `).all();
+        data = products.map(p => [p.id, p.name, p.company_name || '', p.spec, p.unit, p.quantity, p.price, p.remark, p.created_by, p.created_at]);
+        break;
+      case 'stock-in':
+        filename = '入库明细';
+        headers = ['ID', '入库单号', '商品名称', '供货公司', '出货公司', '单位', '单价', '数量', '入库前数量', '入库后数量', '合计金额', '备注', '入库人', '入库时间'];
+        const stockIn = db.prepare(`
+          SELECT si.*, p.name as product_name, c.name as company_name,
+            w.name as warehouse_name
+          FROM stock_in si 
+          LEFT JOIN products p ON si.product_id = p.id 
+          LEFT JOIN companies c ON si.company_id = c.id 
+          LEFT JOIN warehouses w ON si.warehouse_id = w.id
+          WHERE 1=1 ${timeFilterStockIn}
+          ORDER BY si.id ASC
+        `).all();
+        data = stockIn.map(s => [s.id, s.order_no, s.product_name, s.company_name || '', s.warehouse_name || '', s.unit, s.price, s.quantity, s.before_qty, s.after_qty, s.total_amount, s.remark, s.operator, s.created_at]);
+        break;
+      case 'stock-out':
+        filename = '出库明细';
+        headers = ['ID', '出库单号', '采购单号', '商品名称', '客户单位', '出货公司', '单位', '单价', '数量', '出库前数量', '出库后数量', '合计金额', '备注', '出库人', '出库时间'];
+        const stockOut = db.prepare(`
+          SELECT so.*, p.name as product_name, cl.name as client_name,
+            w.name as warehouse_name
+          FROM stock_out so 
+          LEFT JOIN products p ON so.product_id = p.id 
+          LEFT JOIN clients cl ON so.client_id = cl.id 
+          LEFT JOIN warehouses w ON so.warehouse_id = w.id
+          WHERE 1=1 ${timeFilterStockOut}
+          ORDER BY so.id ASC
+        `).all();
+        console.log('导出出库明细 - 记录数:', stockOut.length);
+        if (stockOut.length > 0) {
+          console.log('第一条数据示例:', {
+            order_no: stockOut[0].order_no,
+            purchase_order_no: stockOut[0].purchase_order_no,
+            product_name: stockOut[0].product_name
+          });
+        }
+        data = stockOut.map(s => {
+          const row = [s.id, s.order_no, s.purchase_order_no || '', s.product_name, s.client_name || '', s.warehouse_name || '', s.unit, s.price, s.quantity, s.before_qty, s.after_qty, s.total_amount, s.remark, s.operator, s.created_at];
+          console.log('数据行:', row);
+          return row;
+        });
+        console.log('表头:', headers);
+        console.log('数据行数:', data.length);
+        break;
+      case 'expenses':
+        filename = '开销明细';
+        headers = ['ID', '开销名称', '分类', '支付方式', '支付金额', '支付人', '加给谁', '备注', '记录人', '记录时间'];
+        const expenses = db.prepare(`
+          SELECT * FROM expenses 
+          WHERE 1=1 ${timeFilterExpenses}
+          ORDER BY id ASC
+        `).all();
+        data = expenses.map(e => [e.id, e.name, e.category, e.pay_method, e.amount, e.payer, e.recipient, e.remark, e.created_by, e.created_at]);
+        break;
+      default:
+        return res.json({ code: 400, message: '不支持的导出类型' });
+    }
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+    ws['!cols'] = headers.map(() => ({ wch: 15 }));
+    XLSX.utils.book_append_sheet(wb, ws, filename);
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=${encodeURIComponent(filename)}.xlsx`);
+    res.send(buffer);
+  } catch (err) {
+    console.error('导出错误:', err.message);
+    res.status(500).json({ code: 500, message: '导出失败：' + err.message });
   }
-
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
-  ws['!cols'] = headers.map(() => ({ wch: 15 }));
-  XLSX.utils.book_append_sheet(wb, ws, filename);
-  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-  
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', `attachment; filename=${encodeURIComponent(filename)}.xlsx`);
-  res.send(buffer);
 });
 
 // 商品导入模板下载
@@ -176,7 +216,9 @@ router.post('/backup', adminMiddleware, (req, res) => {
   if (!fs.existsSync(backupDir)) {
     fs.mkdirSync(backupDir, { recursive: true });
   }
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  // 使用北京时间 (UTC+8)
+  const now = new Date(Date.now() + 8 * 3600 * 1000);
+  const timestamp = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}T${String(now.getUTCHours()).padStart(2, '0')}-${String(now.getUTCMinutes()).padStart(2, '0')}-${String(now.getUTCSeconds()).padStart(2, '0')}`;
   const backupFile = path.join(backupDir, `backup_${timestamp}.db`);
   fs.copyFileSync(DB_PATH, backupFile);
   res.json({ code: 0, message: '备份成功', data: { filename: `backup_${timestamp}.db` } });
@@ -219,17 +261,24 @@ router.post('/restore', adminMiddleware, upload.single('file'), (req, res) => {
   }
 
   try {
+    // 关闭当前数据库连接
+    const { closeDb, initDb } = require('../db/init');
+    closeDb();
+    
     // 复制备份文件覆盖当前数据库
     fs.copyFileSync(sourcePath, DB_PATH);
+    
     // 删除上传的临时文件
     if (req.file) {
       fs.unlinkSync(req.file.path);
     }
-    // 重新初始化数据库连接
-    const { initDb } = require('../db/init');
+    
+    // 重新初始化数据库连接（会自动打开新文件）
     initDb();
+    
     res.json({ code: 0, message: '恢复成功' });
   } catch (err) {
+    console.error('数据库恢复错误:', err.message);
     res.json({ code: 500, message: '恢复失败，请检查备份文件' });
   }
 });
@@ -238,21 +287,44 @@ router.post('/restore', adminMiddleware, upload.single('file'), (req, res) => {
 router.post('/reset', adminMiddleware, (req, res) => {
   try {
     const db = getDb();
-    // 清空所有表数据
-    db.exec('DELETE FROM stock_in');
-    db.exec('DELETE FROM stock_out');
+    
+    // 关闭外键检查，避免删除顺序问题导致失败
+    db.pragma('foreign_keys = OFF');
+    
+    // 清空所有表数据（按依赖顺序：先删子表，再删主表）
+    // 第1层：最底层子表（只包含外键，不被引用）
+    db.exec('DELETE FROM purchase_items');           // → products
+    db.exec('DELETE FROM stock_in');                 // → products, companies
+    db.exec('DELETE FROM stock_out');                // → products, clients
+    db.exec('DELETE FROM product_warehouse_stock');  // → products, warehouses
+    
+    // 第2层：中间层子表
+    db.exec('DELETE FROM purchase_orders');          // → clients
+    
+    // 第3层：无外键依赖的表
     db.exec('DELETE FROM expenses');
-    db.exec('DELETE FROM products');
-    db.exec('DELETE FROM companies');
-    db.exec('DELETE FROM clients');
-    // 删除非默认管理员的用户
+    db.exec('DELETE FROM settings');
+    
+    // 第4层：主表（被其他表引用）
+    db.exec('DELETE FROM products');                 // 被 stock_in, stock_out, product_warehouse_stock 引用
+    db.exec('DELETE FROM companies');                // 被 products, stock_in 引用
+    db.exec('DELETE FROM clients');                  // 被 purchase_orders, stock_out 引用
+    db.exec('DELETE FROM warehouses');               // 被 product_warehouse_stock 引用
+    
+    // 第5层：用户表（保留默认管理员）
     db.exec('DELETE FROM users WHERE is_default != 1');
+    
     // 重置默认管理员密码
     const hashedPassword = bcrypt.hashSync('admin', 10);
     db.prepare('UPDATE users SET password = ? WHERE is_default = 1').run(hashedPassword);
-    res.json({ code: 0, message: '数据库重置成功' });
+    
+    // 重新启用外键检查
+    db.pragma('foreign_keys = ON');
+    
+    res.json({ code: 0, message: '数据库重置成功，默认管理员密码已恢复为admin' });
   } catch (err) {
-    res.json({ code: 500, message: '重置失败' });
+    console.error('数据库重置错误:', err.message);
+    res.json({ code: 500, message: '重置失败：' + err.message });
   }
 });
 

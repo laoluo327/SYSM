@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: server
+title: 企业进销存与财务后端服务
+scope:
+    - server/
+source_files: []
+depends_on: []
+related_to: []
